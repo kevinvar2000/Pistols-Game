@@ -1,0 +1,30 @@
+Client:				Server:
+---------------------------------------------------------
+CONNECT: Player1	->		
+			<-	CONNECTING: Player1	
+
+WAIT_FOR_PLAYER		->	
+			<-	WAITING_FOR_PLAYER
+
+CONNECT: Player2	->		
+			<-	CONNECTING: Player2
+
+START_GAME		->	
+			<-	STARTING_GAME
+-							-
+For example:		
+PLAYER_ACTION: Reload	->	
+			<-	ACTION_ACCEPTED: Reload	
+PLAYER_ACTION: Shoot	->
+			<-	ACTION_ACCEPTED: Shoot	
+PLAYER_ACTION: Cover	->
+			<-	ACTION_ACCEPTED: Cover
+-							-
+
+DISCONNECT: Player1	->	
+			<-	DISCONNECTING: Player1
+
+DISCONNECT: Player2	->	
+			<-	DISCONNECTING: Player2
+
+
