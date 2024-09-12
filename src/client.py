@@ -1,8 +1,10 @@
 import socket
 import threading
 
-class PistolGameClient:
+class Client:
+
     def __init__(self):
+    
         self.server_address = ('127.0.0.1', 12345)  # IP adresa a port serveru
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client_socket.connect(self.server_address)
@@ -14,6 +16,7 @@ class PistolGameClient:
         # Uživatelské rozhraní nebo jiná logika klienta může být implementována zde
 
     def receive_messages(self):
+
         while True:
             try:
                 message = self.client_socket.recv(1024).decode('utf-8')
@@ -25,13 +28,15 @@ class PistolGameClient:
                 break
 
     def send_message(self, message):
+
         try:
             self.client_socket.sendall(message.encode('utf-8'))
         except Exception as e:
             print(f"Chyba při odesílání zprávy: {e}")
 
 if __name__ == "__main__":
-    client = PistolGameClient()
+    
+    client = Client()
     
     while True:
         user_input = input("Zadejte akci (RELOAD/SHOOT/COVER): ")
