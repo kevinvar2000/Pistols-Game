@@ -5,7 +5,7 @@ class Client:
 
     def __init__(self):
     
-        self.server_address = ('127.0.0.1', 12345)  # IP adresa a port serveru
+        self.server_address = ('127.0.0.1', 8080)  # IP adresa a port serveru
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client_socket.connect(self.server_address)
 
