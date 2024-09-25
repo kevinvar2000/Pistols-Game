@@ -29,8 +29,29 @@ func handleConnection(conn net.Conn) {
 
 func main() {
 
+	server := "localhost"
+	port := "8080"
+
+	// Read arguments from the command line
+	// args := os.Args
+	// if len(args) < 2 {
+	// 	fmt.Println("Usage: go run server.go <server> <port>")
+	// 	return
+	// }
+
+	// server := args[1]
+	// port := args[2]
+
+	// fmt.Println("Starting server on", server+":"+port)
+
+	// fmt.Print("Enter the server address: ")
+	// fmt.Scanln(&server)
+
+	// fmt.Print("Enter the port number: ")
+	// fmt.Scanln(&port)
+
 	// Listen for incoming connections
-	listener, err := net.Listen("tcp", ":8080")
+	listener, err := net.Listen("tcp", server+":"+port)
 
 	if err != nil {
 		fmt.Println("Error listening:", err.Error())
@@ -38,7 +59,7 @@ func main() {
 	}
 	defer listener.Close()
 
-	fmt.Println("Listening on port 8080...")
+	fmt.Println("Starting server on", server+":"+port)
 
 	// Accept connections in a loop
 	for {
