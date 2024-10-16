@@ -5,10 +5,40 @@ import (
 	"net"
 )
 
-func handleConnection(conn net.Conn) {
+func (s *Server) addClient(client Client) {
+	s.clients[client.name] = client
+}
+
+func (s *Server) removeClient(client Client) {
+	delete(s.clients, client.name)
+}
+
+func (s *Server) broadcast(message string) {
+	for _, client := range s.clients {
+		client.conn.Write([]byte(message))
+	}
+}
+
+func (s *Server) handleConnection(conn net.Conn) {
 
 	// Buffer for incoming data
 	buffer := make([]byte, 1024)
+
+	// Read the client
+	msg, err := conn.Read(buffer)
+	if err != nil {
+		fmt.Println("Error reading:", err.Error())
+		return
+	}
+
+	// Create a new client
+	client := Client{conn, string(buffer[:msg])}
+
+	// Add the client to the server
+	s.addClient(client)
+
+	// Broadcast the new client
+	s.broadcast(client.name + " has joined the chat")
 
 	for {
 		// Read the incoming connection
@@ -21,8 +51,8 @@ func handleConnection(conn net.Conn) {
 		// Output the received message
 		fmt.Println("Received message:", string(buffer[:msg]))
 
-		// Send a response back to the client
-		conn.Write([]byte("Message received"))
+		// Broadcast the message to all clients
+		s.broadcast(client.name + ": " + string(buffer[:msg]))
 	}
 
 }
@@ -31,6 +61,7 @@ func main() {
 
 	server := "localhost"
 	port := "8080"
+	server_instance := Server{make(map[string]Client)}
 
 	// Read arguments from the command line
 	// args := os.Args
@@ -72,7 +103,7 @@ func main() {
 		}
 
 		// Handle connection in a separate goroutine for concurrency
-		go handleConnection(conn)
+		go server_instance.handleConnection(conn)
 	}
 
 }

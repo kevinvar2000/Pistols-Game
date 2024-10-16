@@ -1,30 +1,66 @@
-Client:				Server:
+Client:											Server:
 ---------------------------------------------------------
-CONNECT: Player1	->		
-			<-	CONNECTING: Player1	
+CONNECT: Player1			->		
+								<-		CONNECTING: Player1	
 
-WAIT_FOR_PLAYER		->	
-			<-	WAITING_FOR_PLAYER
+WAIT_FOR_PLAYER				->	
+								<-		WAITING_FOR_PLAYER
 
-CONNECT: Player2	->		
-			<-	CONNECTING: Player2
+CONNECT: Player2			->		
+								<-		CONNECTING: Player2
 
-START_GAME		->	
-			<-	STARTING_GAME
--							-
+START_GAME					->	
+								<-		STARTING_GAME
+
+
 For example:		
-PLAYER_ACTION: Reload	->	
-			<-	ACTION_ACCEPTED: Reload	
-PLAYER_ACTION: Shoot	->
-			<-	ACTION_ACCEPTED: Shoot	
-PLAYER_ACTION: Cover	->
-			<-	ACTION_ACCEPTED: Cover
--							-
-
-DISCONNECT: Player1	->	
-			<-	DISCONNECTING: Player1
-
-DISCONNECT: Player2	->	
-			<-	DISCONNECTING: Player2
+PLAYER_ACTION: Reload		->	
+								<-		ACTION_ACCEPTED: Reload	
+PLAYER_ACTION: Shoot		->
+								<-		ACTION_ACCEPTED: Shoot	
+PLAYER_ACTION: Cover		->
+								<-		ACTION_ACCEPTED: Cover
 
 
+DISCONNECT: Player1			->	
+								<-		DISCONNECTING: Player1
+
+DISCONNECT: Player2			->	
+								<-		DISCONNECTING: Player2
+
+
+
+Start the Server
+Start the Client
+State: Init
+Client connect to server with player name
+Server connected the client with name
+State: Init->Wait
+Client waiting for other player to connect
+Server waiting for other player to connect
+State: Wait->Game
+Other Client connect to server with player name
+Server connected the client with name
+Server Starting the Game
+Client Starting the Game
+
+State:Game
+Server choose action [SHOOT/RELOAD/COVER]
+Client sent action
+Server wait for other player action
+Client waiting for result
+Other Client sent action
+Server sent results
+
+Default action is COVER
+
+
+The game ends if one or both of the players die (One winner or Draw)
+
+Play again or exit?
+
+Play again:
+	start new game
+
+Exit:
+	disconnect players

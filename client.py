@@ -39,3 +39,8 @@ if __name__ == "__main__":
     while True:
         user_input = input("Select an action [SHOOT/RELOAD/COVER] or type 'EXIT' to quit: ")
         client.send_message(f"PLAYER_ACTION: {user_input}")
+        msg = client.receive_messages()
+        print(msg)
+        
+        if user_input == "EXIT":
+            break
