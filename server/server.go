@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 	"sync"
 )
@@ -124,40 +125,28 @@ func main() {
 
 	server := &GameServer{}
 
-	// server_instance := Server{make(map[string]Client)}
+	var address string
 
 	// Read arguments from the command line
-	// args := os.Args
-	// if len(args) < 2 {
-	// 	fmt.Println("Usage: go run server.go <server> <port>")
-	// 	return
-	// }
-
-	// server := args[1]
-	// port := args[2]
-
-	// fmt.Println("Starting server on", server+":"+port)
-
-	// fmt.Print("Enter the server address: ")
-	// fmt.Scanln(&server)
-
-	// fmt.Print("Enter the port number: ")
-	// fmt.Scanln(&port)
+	args := os.Args
+	if len(args) >= 2 {
+		address = args[1]
+	} else {
+		address = CONN_ADDRESS + ":" + CONN_PORT
+	}
 
 	// Listen for incoming connections
-	listener, err := net.Listen(CONN_NETWORK, CONN_ADDRESS+":"+CONN_PORT)
-
+	listener, err := net.Listen(CONN_NETWORK, address)
 	if err != nil {
 		fmt.Println("Error listening:", err.Error())
 		return
 	}
 	defer listener.Close()
 
-	fmt.Println("Starting server on", CONN_ADDRESS+":"+CONN_PORT)
+	fmt.Println("Starting server on", address)
 
 	// Accept connections in a loop
 	for {
-
 		conn, err := listener.Accept()
 		if err != nil {
 			fmt.Println("Error accepting connection:", err.Error())
@@ -169,5 +158,4 @@ func main() {
 		client := &Client{conn: conn}
 		go server.handleClient(client)
 	}
-
 }
