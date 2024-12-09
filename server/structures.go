@@ -14,12 +14,21 @@ type Client struct {
 
 // Room structure
 type Room struct {
-	clients []*Client
-	mu      *sync.Mutex
+	clients  []*Client
+	mu       sync.Mutex
+	states   map[*Client]*PlayerState
+	gameOver bool
 }
 
-// GameServer manages the connected clients and rooms
+// GameServer structure
 type GameServer struct {
 	rooms []*Room
 	mu    sync.Mutex
+}
+
+// PlayerState structure
+type PlayerState struct {
+	health int
+	ammo   int
+	action string
 }
