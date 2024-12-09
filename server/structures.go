@@ -1,14 +1,25 @@
 package main
 
-import "net"
+import (
+	"net"
+	"sync"
+)
 
 // Client structure
 type Client struct {
 	conn net.Conn
 	name string
+	room *Room
 }
 
-// Server structure
-type Server struct {
-	clients map[string]Client
+// Room structure
+type Room struct {
+	clients []*Client
+	mu      *sync.Mutex
+}
+
+// GameServer manages the connected clients and rooms
+type GameServer struct {
+	rooms []*Room
+	mu    sync.Mutex
 }
