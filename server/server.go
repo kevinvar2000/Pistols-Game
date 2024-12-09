@@ -124,8 +124,6 @@ func main() {
 
 	server := &GameServer{}
 
-	address := "0.0.0.0"
-	port := "8080"
 	// server_instance := Server{make(map[string]Client)}
 
 	// Read arguments from the command line
@@ -147,7 +145,7 @@ func main() {
 	// fmt.Scanln(&port)
 
 	// Listen for incoming connections
-	listener, err := net.Listen("tcp", address+":"+port)
+	listener, err := net.Listen(CONN_NETWORK, CONN_ADDRESS+":"+CONN_PORT)
 
 	if err != nil {
 		fmt.Println("Error listening:", err.Error())
@@ -155,7 +153,7 @@ func main() {
 	}
 	defer listener.Close()
 
-	fmt.Println("Starting server on", address+":"+port)
+	fmt.Println("Starting server on", CONN_ADDRESS+":"+CONN_PORT)
 
 	// Accept connections in a loop
 	for {
