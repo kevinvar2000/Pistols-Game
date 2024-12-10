@@ -11,7 +11,9 @@ import (
 )
 
 // Remove a client from the room
-func (r *Room) removeClient(client *Client) {
+func (r *Room) removeClient(client *Client, server *GameServer) {
+
+	fmt.Println("***Removing client from room***")
 
 	if r == nil {
 		fmt.Println("Warning: Attempted to remove client from a nil room")
@@ -31,14 +33,51 @@ func (r *Room) removeClient(client *Client) {
 		}
 	}
 
-	// If the room is empty after removing the client, set it to nil
-	if len(r.clients) == 0 {
-		client.room = nil // Set client.room to nil after removing client
+	println("Remaining clients in the room:", len(r.clients))
+
+	// Notify remaining clients
+	if len(r.clients) > 0 {
+		fmt.Println("Notifying remaining clients in the room.")
+		r.mu.Unlock()
+		r.broadcast(fmt.Sprintf("Player %s has left the room.", client.name), client)
+		r.mu.Lock()
+	} else {
+		// If no clients remain, clean up the room
+		fmt.Println("Room is now empty; cleaning up.")
+		client.room = nil
+
+		// Perform cleanup after unlocking to avoid deadlocks
+		go func() {
+			server.mu.Lock()
+			defer server.mu.Unlock()
+			server.removeRoom(r)
+		}()
 	}
+	fmt.Println()
+}
+
+func (s *GameServer) removeRoom(room *Room) {
+
+	fmt.Println("***Removing empty room from server***")
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for i, r := range s.rooms {
+		if r == room {
+			s.rooms = append(s.rooms[:i], s.rooms[i+1:]...)
+			fmt.Println("Removed empty room from server.")
+			break
+		}
+	}
+	fmt.Println()
 }
 
 // Broadcast sends a message to all clients in the room
 func (r *Room) broadcast(message string, sender *Client) {
+
+	fmt.Println("***Broadcasting message to all clients in the room***")
+
 	r.mu.Lock()
 	fmt.Println("Locking room in broadcast")
 	defer r.mu.Unlock()
@@ -50,15 +89,19 @@ func (r *Room) broadcast(message string, sender *Client) {
 		}
 	}
 	fmt.Println("Broadcast message:", message)
+	fmt.Println()
 }
 
 // Handle client communication and room assignment
 func (s *GameServer) handleClient(client *Client) {
+
+	fmt.Println("***Handling client***")
+
 	defer func() {
 		// Handle client disconnection or early exit
 		if client.room != nil && len(client.room.clients) == 2 {
 			fmt.Println("Client disconnected:", client.name)
-			client.room.removeClient(client)
+			client.room.removeClient(client, s)
 			client.room.broadcast(fmt.Sprintf("%s has left the game.", client.name), client) // Inform the other player
 		} else {
 			fmt.Println("Client left before game started:", client.name)
@@ -66,30 +109,56 @@ func (s *GameServer) handleClient(client *Client) {
 		client.conn.Close()
 	}()
 
-	// Step 1: Handle client name registration
+	// **Register client name**
 	if err := s.registerClientName(client); err != nil {
 		fmt.Println("Error registering client:", err)
 		return
 	}
 
-	// Step 2: Assign room and wait for second player
+	// **Wait for the second player to join**
 	if err := s.waitForSecondPlayer(client); err != nil {
 		fmt.Println("Error waiting for second player:", err)
 		return
 	}
 
-	// Step 3: Start the game once both players have joined
+	// **Start the game**
 	if err := s.startGame(client); err != nil {
 		fmt.Println("Error starting the game:", err)
 		return
 	}
 
-	// Step 4: Handle player actions during the game
+	// **Handle player actions during the game**
 	s.handleGameActions(client)
+
+	// Start the ping goroutine to monitor the client's activity
+	go s.pingClient(client)
+	fmt.Println()
 }
 
-// Step 1: Register client name
+// Ping the client to check if they are still alive
+func (s *GameServer) pingClient(client *Client) {
+
+	fmt.Println("***Pinging client***")
+
+	ticker := time.NewTicker(30 * time.Second) // Ping every 30 seconds
+	defer ticker.Stop()
+
+	for range ticker.C {
+		client.conn.SetWriteDeadline(time.Now().Add(5 * time.Second)) // Set timeout for ping response
+		_, err := fmt.Fprintf(client.conn, "PING\n")
+		if err != nil {
+			fmt.Println("Ping failed for client", client.name, "Error:", err)
+			client.room.removeClient(client, s) // Remove client from room if ping fails
+			return
+		}
+	}
+	fmt.Println()
+}
+
 func (s *GameServer) registerClientName(client *Client) error {
+
+	fmt.Println("***Registering client name***")
+
 	reader := bufio.NewReader(client.conn)
 	client.conn.Write([]byte("CONNECT: Enter your name: \n"))
 
@@ -98,6 +167,7 @@ func (s *GameServer) registerClientName(client *Client) error {
 	if err != nil {
 		return fmt.Errorf("failed to read name: %v", err)
 	}
+
 	client.name = strings.TrimSpace(name)
 	client.conn.Write([]byte(fmt.Sprintf("CONNECTING: %s\n", client.name)))
 	fmt.Println("Client connected with name:", client.name)
@@ -105,11 +175,15 @@ func (s *GameServer) registerClientName(client *Client) error {
 	client.room = s.assignRoom(client)
 	fmt.Println("Assigned room to client:", client.name, "Room:", client.room)
 
+	fmt.Println()
 	return nil
 }
 
 // Step 2: Wait for the second player to join
 func (s *GameServer) waitForSecondPlayer(client *Client) error {
+
+	fmt.Println("***Waiting for second player to join***")
+
 	client.conn.Write([]byte("WAITING_FOR_PLAYER\n"))
 	fmt.Println("Waiting for another player to join the room:", client.room.clients[0].name)
 
@@ -123,7 +197,7 @@ func (s *GameServer) waitForSecondPlayer(client *Client) error {
 
 		client.room.mu.Lock()
 		currentCount := len(client.room.clients)
-		fmt.Printf("Current room count: %d\n", currentCount)
+		// fmt.Printf("Current room count: %d\n", currentCount)
 
 		if currentCount == 2 {
 			client.room.mu.Unlock()
@@ -136,24 +210,33 @@ func (s *GameServer) waitForSecondPlayer(client *Client) error {
 		case <-timeout:
 			fmt.Println("Timeout reached: No second player joined.")
 			client.conn.Write([]byte("TIMEOUT: No second player joined.\n"))
-			client.room.removeClient(client) // Clean up the client from the room
+			client.room.removeClient(client, s)
 			return fmt.Errorf("timeout reached: no second player joined")
 		default:
 			time.Sleep(100 * time.Millisecond) // Prevent busy looping
 		}
 	}
+	fmt.Println()
 	return nil
 }
 
 // Step 3: Start the game
 func (s *GameServer) startGame(client *Client) error {
+
+	fmt.Println("***Starting the game***")
+
 	client.conn.Write([]byte("STARTING_GAME\n"))
 	client.room.broadcast(fmt.Sprintf("%s has joined. Game starts now!", client.name), client)
+
+	fmt.Println()
 	return nil
 }
 
 // Step 4: Handle player actions during the game
 func (s *GameServer) handleGameActions(client *Client) {
+
+	fmt.Println("***Handling player actions during the game***")
+
 	reader := bufio.NewReader(client.conn)
 
 	for {
@@ -164,7 +247,7 @@ func (s *GameServer) handleGameActions(client *Client) {
 				fmt.Println("Client closed the connection:", client.name)
 			}
 			fmt.Printf("Error reading message from client %s: %v\n", client.name, err)
-			client.room.removeClient(client)
+			client.room.removeClient(client, s)
 			break
 		}
 
@@ -174,13 +257,17 @@ func (s *GameServer) handleGameActions(client *Client) {
 		if strings.HasPrefix(message, "PLAYER_ACTION:") {
 			client.room.handleAction(client, strings.TrimPrefix(message, "PLAYER_ACTION:"))
 		} else if message == "DISCONNECT" {
-			client.room.removeClient(client)
+			client.room.removeClient(client, s)
 			break
 		}
 	}
+	fmt.Println()
 }
 
 func (r *Room) handleAction(client *Client, action string) {
+
+	fmt.Println("***Handling player action in the room***")
+
 	r.mu.Lock()
 	fmt.Println("Locking room in handleAction")
 	defer r.mu.Unlock()
@@ -198,9 +285,13 @@ func (r *Room) handleAction(client *Client, action string) {
 		r.resolveActions(player1, player2)
 		r.resetActions()
 	}
+	fmt.Println()
 }
 
 func (r *Room) resolveActions(p1, p2 *PlayerState) {
+
+	fmt.Println("***Resolving player actions in the room***")
+
 	fmt.Println("Resolving actions:", p1.action, p2.action)
 	if p1.action == "SHOOT" && p2.action != "COVER" {
 		p2.health -= 1
@@ -218,17 +309,25 @@ func (r *Room) resolveActions(p1, p2 *PlayerState) {
 	} else {
 		r.broadcast(fmt.Sprintf("RESULT: Player1 - %d HP, Player2 - %d HP", p1.health, p2.health), nil)
 	}
+	fmt.Println()
 }
 
 func (r *Room) resetActions() {
+
+	fmt.Println("***Resetting actions for all clients in the room***")
+
 	for _, client := range r.clients {
 		r.states[client].action = ""
 	}
 	fmt.Println("Actions reset for all clients in the room")
+	fmt.Println()
 }
 
 // Create or find a room for a new client
 func (s *GameServer) assignRoom(client *Client) *Room {
+
+	fmt.Println("***Assigning room to client***")
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -243,6 +342,7 @@ func (s *GameServer) assignRoom(client *Client) *Room {
 
 			room.states[client] = &PlayerState{health: 3, ammo: 1, action: "COVER"}
 			fmt.Println("Client assigned to existing room:", client.name)
+			fmt.Println()
 			return room
 		}
 	}
@@ -259,6 +359,8 @@ func (s *GameServer) assignRoom(client *Client) *Room {
 	fmt.Println("Appending new room to server:", newRoom)
 	s.rooms = append(s.rooms, newRoom)
 	fmt.Println("Client assigned to new room:", client.name)
+
+	fmt.Println()
 	return newRoom
 }
 
