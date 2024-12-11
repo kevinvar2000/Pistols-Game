@@ -15,11 +15,11 @@ func (s *GameServer) Start_game(client *Client) error {
 	client.conn.Write([]byte("STARTING_GAME\n"))
 	client.room.Broadcast(fmt.Sprintf("%s has joined. Game starts now!", client.name), client)
 
+	fmt.Println("***Game started***")
 	fmt.Println()
 	return nil
 }
 
-// Step 4: Handle player actions during the game
 func (s *GameServer) Handle_game_actions(client *Client) {
 
 	fmt.Println("***Handling player actions during the game***")
@@ -65,6 +65,8 @@ func (s *GameServer) Handle_game_actions(client *Client) {
 		client.conn.Write([]byte("GAME: Enter your action (SHOOT, COVER, RELOAD) or type DISCONNECT to leave: \n"))
 
 	}
+
+	fmt.Println("***After handling player actions during the game***")
 	fmt.Println()
 }
 
@@ -73,34 +75,90 @@ func (r *Room) Handle_action(client *Client, action string) {
 	fmt.Println("***Handling player action in the room***")
 
 	r.mu.Lock()
-	fmt.Println("Locking room in handleAction")
-	defer r.mu.Unlock()
-	fmt.Println("Unlocking room in handleAction")
-
 	state := r.states[client]
 	state.action = strings.ToUpper(action)
-	fmt.Println("Client:", client.name, "Action:", state.action)
+	fmt.Println("Client:", client.name, ", Action:", state.action)
 
-	if len(r.clients) == 2 && r.states[r.clients[0]].action != "" && r.states[r.clients[1]].action != "" {
-		// Resolve actions
-		player1 := r.states[r.clients[0]]
-		player2 := r.states[r.clients[1]]
-
-		r.Resolve_action(player1, player2)
-		r.Reset_action()
+	fmt.Println("Current actions in the room:")
+	for _, client := range r.clients {
+		fmt.Println(client.name, ":", r.states[client].action)
 	}
+	r.mu.Unlock() // Unlock immediately after updating state
+
+	// Trigger waiting logic
+	go r.Wait_for_action()
+
+	fmt.Println("***After handling player action in the room***")
 	fmt.Println()
+}
+
+func (r *Room) Wait_for_action() {
+
+	fmt.Println("***Waiting for second action***")
+
+	// Timeout duration (e.g., 10 seconds)
+	timeout := time.After(10 * time.Second)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeout:
+			fmt.Println("Timeout reached while waiting for second player's action.")
+
+			fmt.Println("Aquiring lock in wait for action timeout.")
+			r.mu.Lock()
+			fmt.Println("Lock acquired in wait for action timeout.")
+
+			// Apply default action for any missing responses
+			for _, client := range r.clients {
+				if r.states[client].action == "" {
+					r.states[client].action = "COVER" // Default action
+					fmt.Printf("Default action applied for %s: COVER\n", client.name)
+				}
+			}
+
+			player1_action := r.states[r.clients[0]]
+			player2_action := r.states[r.clients[1]]
+
+			r.mu.Unlock() // Unlock before resolving
+
+			r.Resolve_action(player1_action, player2_action)
+			r.Reset_action()
+
+			fmt.Println("Exiting after timeout.")
+			return
+
+		case <-ticker.C:
+
+			fmt.Println("Acquiring lock in wait for action.")
+			r.mu.Lock()
+			fmt.Println("Lock acquired in wait for action.")
+			allReceived := r.states[r.clients[0]].action != "" && r.states[r.clients[1]].action != ""
+			r.mu.Unlock()
+
+			if allReceived {
+				fmt.Println("Both actions received before timeout.")
+
+				player1_action := r.states[r.clients[0]]
+				player2_action := r.states[r.clients[1]]
+
+				r.Resolve_action(player1_action, player2_action)
+				r.Reset_action()
+				fmt.Println("Exiting after both actions received.")
+				return
+			}
+		}
+	}
 }
 
 func (r *Room) Resolve_action(p1, p2 *PlayerState) {
 
 	fmt.Println("***Resolving player actions in the room***")
 
-	// Lock the room before making changes
+	fmt.Println("Acquiring lock in resolve action.")
 	r.mu.Lock()
-	fmt.Println("Locking room in resolveActions")
-	defer r.mu.Unlock()
-	fmt.Println("Unlocking room in resolveActions")
+	fmt.Println("Lock acquired in resolve action.")
 
 	fmt.Println("Resolving actions:", p1.action, p2.action)
 	if p1.action == "SHOOT" && p2.action != "COVER" {
@@ -137,7 +195,10 @@ func (r *Room) Resolve_action(p1, p2 *PlayerState) {
 		result_msg = fmt.Sprintf("RESULT: Player1 - %d HP, Player2 - %d HP", p1.health, p2.health)
 	}
 
+	r.mu.Unlock()
+
 	r.Broadcast(result_msg, nil)
+	fmt.Println("***After resolving player actions in the room***")
 	fmt.Println()
 }
 
@@ -148,7 +209,8 @@ func (r *Room) Reset_action() {
 	for _, client := range r.clients {
 		r.states[client].action = ""
 	}
-	fmt.Println("Actions reset for all clients in the room")
+
+	fmt.Println("***After resetting actions for all clients***")
 	fmt.Println()
 }
 
@@ -188,6 +250,8 @@ func (s *GameServer) Wait_for_player(client *Client) error {
 			time.Sleep(100 * time.Millisecond) // Prevent busy looping
 		}
 	}
+
+	fmt.Println("***After waiting for second player to join***")
 	fmt.Println()
 	return nil
 }
