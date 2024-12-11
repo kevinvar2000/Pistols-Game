@@ -17,10 +17,10 @@ func (r *Room) Remove_client(client *Client, server *GameServer) {
 		return
 	}
 
+	fmt.Println("Acquiring lock in remove client")
 	r.mu.Lock()
-	fmt.Println("Locking room in Remove_client")
+	fmt.Println("Lock acquired in remove client")
 	defer r.mu.Unlock()
-	fmt.Println("Unlocking room in Remove_client")
 
 	for i, c := range r.clients {
 		if c == client {
@@ -37,7 +37,9 @@ func (r *Room) Remove_client(client *Client, server *GameServer) {
 		fmt.Println("Notifying remaining clients in the room.")
 		r.mu.Unlock()
 		r.Broadcast(fmt.Sprintf("Player %s has left the room.", client.name), client)
+		fmt.Println("Acquiring lock after notifying remaining clients.")
 		r.mu.Lock()
+		fmt.Println("Lock acquired after notifying remaining clients.")
 	} else {
 		// If no clients remain, clean up the room
 		fmt.Println("Room is now empty; cleaning up.")
@@ -45,11 +47,15 @@ func (r *Room) Remove_client(client *Client, server *GameServer) {
 
 		// Perform cleanup after unlocking to avoid deadlocks
 		go func() {
+			fmt.Println("Acquiring lock in remove client cleanup.")
 			server.mu.Lock()
+			fmt.Println("Lock acquired in remove client cleanup.")
 			defer server.mu.Unlock()
 			server.Remove_room(r)
 		}()
 	}
+
+	fmt.Println("***After removing client from room***")
 	fmt.Println()
 }
 
@@ -70,8 +76,9 @@ func (s *GameServer) Assign_room(client *Client) *Room {
 				room.states = make(map[*Client]*PlayerState)
 			}
 
-			room.states[client] = &PlayerState{health: 3, ammo: 1, action: "COVER"}
+			room.states[client] = &PlayerState{health: 3, ammo: 1, action: ""}
 			fmt.Println("Client assigned to existing room:", client.name)
+			fmt.Println("***After assigning room to client***")
 			fmt.Println()
 			return room
 		}
@@ -83,13 +90,14 @@ func (s *GameServer) Assign_room(client *Client) *Room {
 	}
 	fmt.Println("New room created:", newRoom)
 
-	newRoom.states[client] = &PlayerState{health: 3, ammo: 1, action: "COVER"}
+	newRoom.states[client] = &PlayerState{health: 3, ammo: 1, action: ""}
 	fmt.Println("Client state set in new room:", client.name, newRoom.states[client])
 
 	fmt.Println("Appending new room to server:", newRoom)
 	s.rooms = append(s.rooms, newRoom)
 	fmt.Println("Client assigned to new room:", client.name)
 
+	fmt.Println("***After assigning room to client***")
 	fmt.Println()
 	return newRoom
 }
@@ -108,6 +116,8 @@ func (s *GameServer) Remove_room(room *Room) {
 			break
 		}
 	}
+
+	fmt.Println("***After removing empty room from server***")
 	fmt.Println()
 }
 
@@ -116,17 +126,19 @@ func (r *Room) Broadcast(message string, sender *Client) {
 
 	fmt.Println("***Broadcasting message to all clients in the room***")
 
+	fmt.Println("Acquiring lock in broadcast")
 	r.mu.Lock()
-	fmt.Println("Locking room in Broadcast")
-	defer r.mu.Unlock()
-	fmt.Println("Unlocking room in Broadcast")
+	fmt.Println("Lock acquired in broadcast")
+	clients := append([]*Client{}, r.clients...) // Make a copy of the client slice
+	r.mu.Unlock()
 
-	for _, client := range r.clients {
+	for _, client := range clients {
 		if client != sender {
 			fmt.Fprintf(client.conn, message+"\n")
 		}
 	}
 	fmt.Println("Broadcast message:", message)
+	fmt.Println("***After broadcasting message to all clients in the room***")
 	fmt.Println()
 }
 
@@ -170,6 +182,8 @@ func (s *GameServer) Handle_client(client *Client) {
 
 	// Start the ping goroutine to monitor the client's activity
 	go s.Ping_client(client)
+
+	fmt.Println("***After handling client***")
 	fmt.Println()
 }
 
@@ -190,6 +204,8 @@ func (s *GameServer) Ping_client(client *Client) {
 			return
 		}
 	}
+
+	fmt.Println("***After pinging client***")
 	fmt.Println()
 }
 
@@ -213,6 +229,7 @@ func (s *GameServer) Register_client_name(client *Client) error {
 	client.room = s.Assign_room(client)
 	fmt.Println("Assigned room to client:", client.name, "Room:", client.room)
 
+	fmt.Println("***After registering client name***")
 	fmt.Println()
 	return nil
 }
