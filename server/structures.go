@@ -5,28 +5,19 @@ import (
 	"sync"
 )
 
-// Client structure
-type Client struct {
-	conn net.Conn
-	name string
-	room *Room
+type Game struct {
+	players    map[*Player]bool
+	game_state string
+	mutex      *sync.Mutex
 }
 
-// Room structure
-type Room struct {
-	clients  []*Client
-	mu       sync.Mutex
-	states   map[*Client]*PlayerState
-	gameOver bool
+type Player struct {
+	conn         net.Conn
+	name         string
+	player_state PlayerState
+	mutex        sync.Mutex
 }
 
-// GameServer structure
-type GameServer struct {
-	rooms []*Room
-	mu    sync.Mutex
-}
-
-// PlayerState structure
 type PlayerState struct {
 	health int
 	ammo   int
