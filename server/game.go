@@ -26,6 +26,8 @@ func wait_for_players(player *Player) {
 			fmt.Println("Player joined the game:", player.name)
 		}
 
+		broadcast_message(game, "response_type=game_ready&status_code=200&message=Game ready\n")
+
 		// Start the game
 		game.start_game()
 	}
