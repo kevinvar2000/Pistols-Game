@@ -19,5 +19,5 @@ const (
 	ACTION_TIMEOUT        = 20       // Timeout for player actions in seconds
 	ACTION_CHECK_INTERVAL = 500      // Interval to check player actions in milliseconds
 	ROUND_PAUSE_TIME      = 5        // Pause time between rounds in seconds
-	PING_TIME             = 30       // Time interval to ping clients in seconds
+	READ_TIMEOUT          = 20       // Time interval to ping clients in seconds
 )
