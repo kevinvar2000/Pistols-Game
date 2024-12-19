@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strings"
+	"time"
 )
 
 func start_server(address string) net.Listener {
@@ -33,53 +35,107 @@ func accept_connections(listener net.Listener) {
 func handle_connection(conn net.Conn) {
 	defer conn.Close()
 
-	// Read the first message for player registration
-	message, err := read_message(conn)
-	if err != nil {
-		fmt.Println("Error reading from client:", err.Error())
-		return
-	}
-
-	// Parse the player name from the message
-	if !strings.HasPrefix(message, "name:") {
-		conn.Write([]byte("response_type=error&status_code=400&message=Player name required\n"))
-		return
-	}
-	player_name := strings.TrimPrefix(message, "name:")
-	player_name = strings.TrimSpace(player_name)
-
-	// Create player
-	player := create_player(conn, player_name)
-
-	// Wait for other players to join
-	wait_for_players(player)
+	is_registered := false
+	var player *Player
 
 	for {
+		// Set a read deadline for the connection
+		conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 
-		// Read message from client
+		// Read the first message for player registration
 		message, err := read_message(conn)
 		if err != nil {
-			fmt.Println("Error reading from client:", err.Error())
+			// Handle error reading from client
+			if err == io.EOF {
+				fmt.Println("Client disconnected.")
+			} else if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				fmt.Println("Connection timed out.")
+			} else {
+				fmt.Println("Error reading from client:", err.Error())
+			}
 			break
 		}
 
+		// Trim the message of any leading or trailing spaces
 		message = strings.TrimSpace(message)
+		fmt.Println("Received message:", message)
 
-		// Handle different types of requests
-		switch {
-		case message == "exit":
-			exit_game(player)
-		case strings.HasPrefix(message, "action:"):
-			set_player_action(player, strings.ToUpper(strings.TrimPrefix(message, "action:")))
-		case message == "is_alive":
-			is_alive(conn)
-		default:
+		// Check if the message is empty
+		if len(message) == 0 {
+			conn.Write([]byte("response_type=error&status_code=400&message=Empty message received\n"))
+			continue
+		}
+
+		if !strings.HasPrefix(message, "request_type") {
 			invalid_message(player)
+			continue
+		}
+
+		// Trim the message of the request_type prefix
+		message = strings.TrimPrefix(message, "request_type=")
+
+		if strings.HasPrefix(message, "ping") {
+			ping(conn)
+			continue
+		}
+
+		if is_registered {
+
+			switch {
+			case strings.HasPrefix(message, "game_ready"):
+				game_ready(player)
+			case strings.HasPrefix(message, "join_game"):
+				join_game(player)
+			case strings.HasPrefix(message, "leave_game"):
+				leave_game(player)
+			case strings.HasPrefix(message, "exit_game"):
+				exit_game(player)
+			case strings.HasPrefix(message, "action"):
+				set_player_action(player, strings.ToUpper(strings.TrimPrefix(message, "action:")))
+			default:
+				invalid_message(player)
+			}
+		} else {
+			// If the player is not registered, allow only "name:" message for registration
+			if strings.HasPrefix(message, "name") {
+				player = register_player(conn, message)
+				is_registered = true
+			} else {
+				if player != nil {
+					invalid_message(player)
+				}
+			}
 		}
 	}
+
+}
+
+func register_player(conn net.Conn, message string) *Player {
+
+	player_name := strings.TrimPrefix(message, "name&name=")
+	fmt.Println("Registering player:", player_name)
+	conn.Write([]byte("response_type=name&status_code=200&message=Player registered\n"))
+
+	return create_player(conn, player_name)
+}
+
+func game_ready(player *Player) {
+	fmt.Println("Player is ready for the game.")
+	player.conn.Write([]byte("response_type=game_ready&status_code=200&message=Game ready\n"))
+}
+
+func join_game(player *Player) {
+	fmt.Println("Player is joining the game.")
+	player.conn.Write([]byte("response_type=join_game&status_code=200&message=Joining game\n"))
+}
+
+func leave_game(player *Player) {
+	fmt.Println("Player is leaving the game.")
+	player.conn.Write([]byte("response_type=leave_game&status_code=200&message=Leaving game\n"))
 }
 
 func invalid_message(player *Player) {
+	fmt.Println("Invalid message received.")
 	player.conn.Write([]byte("response_type=error&status_code=400&message=Invalid request\n"))
 }
 
@@ -88,13 +144,16 @@ func read_message(conn net.Conn) (string, error) {
 	buffer := make([]byte, 1024)
 	n, err := conn.Read(buffer)
 	if err != nil {
+		fmt.Println("Error reading from client:", err)
 		return "", err
 	}
 	return string(buffer[:n]), nil
 }
 
-func is_alive(conn net.Conn) {
-	conn.Write([]byte("response_type=alive&status_code=200&message=I am alive\n"))
+func ping(conn net.Conn) {
+
+	fmt.Println("Pinging player...")
+	conn.Write([]byte("response_type=ping&status_code=200&message=Pong\n"))
 }
 
 func broadcast_message(game *Game, message string) {
