@@ -1,0 +1,107 @@
+import time
+import threading
+import tkinter as tk
+from game_win import GameWindow
+from const import WIN_SIZE, TITLE_FONT, BUTTON_FONT, INPUT_FONT, ERROR_FONT, LABEL_FONT
+
+class MenuWindow:
+
+
+    def __init__(self, root, client):
+        self.client = client
+
+        self.root = root
+        self.root.title("Menu")
+        self.root.geometry(WIN_SIZE)
+        self.root.resizable(False, False)
+
+        # Title
+        tk.Label(self.root, text="Welcome to the Game!", font=TITLE_FONT).pack(pady=20)
+
+        # Name input field
+        tk.Label(self.root, text="Enter your name:", font=INPUT_FONT).pack(pady=5)
+        self.name_entry = tk.Entry(self.root, font=INPUT_FONT)
+        self.name_entry.pack(pady=5)
+
+        # Error feedback
+        self.error_label = tk.Label(self.root, text="", font=ERROR_FONT, fg="red")
+        self.error_label.pack(pady=10)
+
+        # Buttons
+        tk.Button(self.root, text="Play", font=BUTTON_FONT, command=self.play).pack(pady=10)
+        tk.Button(self.root, text="Back", font=BUTTON_FONT, command=self.back).pack(pady=10)
+
+
+    def play(self):
+
+        name = self.name_entry.get().strip()
+        if not name or len(name) == 0:
+            print("Please enter a valid name.")
+            self.error_label.config(text="Please enter a valid name.")
+            return
+        
+        response = self.client.send_request("request_type=name&name=" + name)
+
+        print(f"Response in menu: {response}")
+
+        if response.get("response_type") == "name":
+            if response.get("status_code") == "200":
+                self.waiting_room(name)
+            else:
+                print(f"Failed to set name: {response.get('message')}")
+                self.error_label.config(text=response.get("message"))
+
+
+    def waiting_room(self, name):
+        # Clear the current window
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+        # Display a waiting message
+        waiting_label = tk.Label(self.root, text="Waiting for other player to join...", font=LABEL_FONT)
+        waiting_label.pack(pady=50)
+
+        # Start a thread to poll the server for readiness
+        threading.Thread(target=self.poll_server_for_game_ready, args=(name,), daemon=True).start()
+
+
+    def poll_server_for_game_ready(self, name):
+        while True:
+            # Send a request to check if the game is ready
+            self.client.send_game_ready()  # This will check if the game is ready
+
+            print(f"Waiting for game to be ready...")
+
+            if self.client.game_started:
+                # Game is ready, load the game window
+                self.root.after(0, self.load_game_window, name)
+                break
+
+            # Wait for a short period before polling again
+            time.sleep(2)
+
+
+    def load_game_window(self, name):
+        # Clear the current window
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+        # TODO: get the player's state
+
+        # Load the game window
+        GameWindow(self.root, self.client, name)
+
+
+    def back(self):
+        # Clear the current window
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+        from connect_win import ConnectWindow
+
+        # Load the connect
+        ConnectWindow(self.root)
+
+
+    def run(self):
+        self.root.mainloop()
