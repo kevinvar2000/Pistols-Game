@@ -54,6 +54,22 @@ class Client:
             print(f"Error sending request: {e}")
             return {"status": "error", "message": str(e)}
 
+    def receive_response(self):
+        try:
+            if not self.socket:
+                raise ConnectionError("Not connected to the server.")
+
+            response_data = self.socket.recv(BUFFER_SIZE).decode('utf-8')
+
+            print(f"Received raw response: {response_data}")
+
+            if not response_data:
+                raise ValueError("Empty response received from the server.")
+
+            return self.parse_response(response_data)
+        except Exception as e:
+            print(f"Error receiving response: {e}")
+            return {"status": "error", "message": str(e)}
 
     def parse_response(self, response_data):
         response = {}
@@ -78,9 +94,10 @@ class Client:
                 break
             time.sleep(5)
 
-    def send_game_ready(self):
+    def is_game_ready(self):
         response = self.send_request("request_type=game_ready")
         return response
+
 
     def close(self):
         self.pinging = False
