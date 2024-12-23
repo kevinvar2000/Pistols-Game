@@ -38,7 +38,7 @@ class ConnectWindow:
 
         # Buttons
         tk.Button(self.root, text="Connect", font=BUTTON_FONT, command=self.connect_and_start).pack(pady=10)
-        tk.Button(self.root, text="Quit", font=BUTTON_FONT, command=self.root.quit).pack(pady=10)
+        tk.Button(self.root, text="Quit", font=BUTTON_FONT, command=self.quit).pack(pady=10)
 
     def connect_and_start(self):
         try:
@@ -71,6 +71,12 @@ class ConnectWindow:
 
         # Load the menu interface
         MenuWindow(self.root, self.client)
+
+
+    def quit(self):
+        self.client.close()
+        self.root.destroy()
+
 
     def run(self):
         self.root.mainloop()
