@@ -1,6 +1,5 @@
-import time
 import tkinter as tk
-from const import WIN_SIZE, TITLE_FONT, BUTTON_FONT, INPUT_FONT, LABEL_FONT, REQUEST_INTERVAL
+from const import WIN_SIZE, BUTTON_FONT, LABEL_FONT
 
 class GameWindow:
     def __init__(self, root, client, client_name):
@@ -115,8 +114,8 @@ class GameWindow:
 
         self.root.protocol("WM_DELETE_WINDOW", self.close_window)
 
+        self.update_labels()
         self.root.mainloop()
-
 
     def get_player_state(self):
         response = self.client.send_request("request_type=player_state", "player_state")
@@ -135,10 +134,6 @@ class GameWindow:
                     self.ammo_label.config(text="Ammo: 0")
                     self.info_label.config(text="You are dead. Game over.")
                     self.root.update_idletasks()
-
-                    print("Health label: ", self.health_label)
-                    print("Ammo label: ", self.ammo_label)
-
                     return
 
                 try:
@@ -151,10 +146,6 @@ class GameWindow:
                     self.health_label.config(text=f"Health: {self.health}")
                     self.ammo_label.config(text=f"Ammo: {self.ammo}")
                     self.root.update_idletasks()
-
-                    print("Health label: ", self.health_label)
-                    print("Ammo label: ", self.ammo_label)
-
                 except (ValueError, KeyError) as e:
                     print(f"Error parsing player state: {e}")
                     self.error_label.config(text="Error parsing player state")
@@ -167,6 +158,10 @@ class GameWindow:
             print(f"Ignoring unrelated response: {response}")
             self.root.after(1000, self.get_player_state)
 
+
+    def update_labels(self):
+        self.get_player_state()
+        self.root.after(1000, self.update_labels)
 
     def close_window(self):
         self.client.close()
