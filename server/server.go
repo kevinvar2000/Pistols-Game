@@ -40,7 +40,7 @@ func handle_connection(conn net.Conn) {
 
 	for {
 		// Set a read deadline for the connection
-		conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+		conn.SetReadDeadline(time.Now().Add(READ_DEADLINE * time.Second))
 
 		// Read the first message for player registration
 		message, err := read_message(conn)
@@ -81,17 +81,19 @@ func handle_connection(conn net.Conn) {
 
 		if is_registered {
 
+			fmt.Println("Message received from registered player:", player.name)
+			fmt.Println("Message:", message)
+
 			switch {
 			case strings.HasPrefix(message, "game_ready"):
 				game_ready(player)
-			case strings.HasPrefix(message, "join_game"):
-				join_game(player)
-			case strings.HasPrefix(message, "leave_game"):
-				leave_game(player)
+			case strings.HasPrefix(message, "player_state"):
+				get_player_state(player)
 			case strings.HasPrefix(message, "exit_game"):
 				exit_game(player)
 			case strings.HasPrefix(message, "action"):
-				set_player_action(player, strings.ToUpper(strings.TrimPrefix(message, "action:")))
+				set_player_action(player, message)
+				conn.Write([]byte("response_type=action&status_code=200&message=Action set\n"))
 			default:
 				invalid_message(player)
 			}
@@ -100,6 +102,8 @@ func handle_connection(conn net.Conn) {
 			if strings.HasPrefix(message, "name") {
 				player = register_player(conn, message)
 				is_registered = true
+
+				go wait_for_players(player)
 			} else {
 				if player != nil {
 					invalid_message(player)
@@ -117,21 +121,6 @@ func register_player(conn net.Conn, message string) *Player {
 	conn.Write([]byte("response_type=name&status_code=200&message=Player registered\n"))
 
 	return create_player(conn, player_name)
-}
-
-func game_ready(player *Player) {
-	fmt.Println("Player is ready for the game.")
-	player.conn.Write([]byte("response_type=game_ready&status_code=200&message=Game ready\n"))
-}
-
-func join_game(player *Player) {
-	fmt.Println("Player is joining the game.")
-	player.conn.Write([]byte("response_type=join_game&status_code=200&message=Joining game\n"))
-}
-
-func leave_game(player *Player) {
-	fmt.Println("Player is leaving the game.")
-	player.conn.Write([]byte("response_type=leave_game&status_code=200&message=Leaving game\n"))
 }
 
 func invalid_message(player *Player) {
