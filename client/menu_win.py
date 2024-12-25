@@ -38,9 +38,9 @@ class MenuWindow:
             self.error_label.config(text="Please enter a valid name.")
             return
         
-        response = self.client.send_request("request_type=name&name=" + name)
+        response = self.client.send_request("request_type=name&name=" + name, "name")
 
-        print(f"Response in menu: {response}")
+        print(f"Response in play: {response}")
 
         if response.get("response_type") == "name":
             if response.get("status_code") == "200":
