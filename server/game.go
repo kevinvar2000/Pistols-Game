@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
 )
@@ -23,6 +24,7 @@ func wait_for_players(player *Player) {
 		for i := 0; i < MAX_PLAYERS; i++ {
 			player := <-waiting_players
 			game.players[player] = true
+			player.game = game
 			fmt.Println("Player joined the game:", player.name)
 		}
 
@@ -31,6 +33,17 @@ func wait_for_players(player *Player) {
 		// Start the game
 		game.start_game()
 	}
+}
+
+func game_ready(player *Player) {
+
+	if player.game != nil {
+		fmt.Println("Game is ready.")
+		player.conn.Write([]byte("response_type=game_ready&status_code=200&message=Game ready\n"))
+	} else {
+		player.conn.Write([]byte("response_type=game_ready&status_code=400&message=Game not ready\n"))
+	}
+
 }
 
 func create_player(conn net.Conn, player_name string) *Player {
@@ -42,7 +55,7 @@ func create_player(conn net.Conn, player_name string) *Player {
 		player_state: PlayerState{health: DEFAULT_HEALTH, ammo: DEFAULT_AMMO, action: ""},
 	}
 	player.name = player_name
-	conn.Write([]byte(fmt.Sprintf("response_type=join_game&status_code=200&player_name=%s\n", player.name)))
+	// conn.Write([]byte(fmt.Sprintf("response_type=join_game&status_code=200&player_name=%s\n", player.name)))
 	return player
 }
 
@@ -64,7 +77,7 @@ func (game *Game) start_game() {
 
 	game.game_state = "running"
 
-	broadcast_message(game, "response_type=start_game&status_code=200&message=Game started\n")
+	// broadcast_message(game, "response_type=start_game&status_code=200&message=Game started\n")
 
 	// Start the game loop
 	go game.game_loop()
@@ -132,7 +145,7 @@ func (game *Game) wait_for_all_actions() bool {
 		case <-timeout:
 			fmt.Println("Timeout reached while waiting for player actions.")
 			// Send a response to the players
-			broadcast_message(game, "response_type=timeout&status_code=200&message=Timeout reached\n")
+			// broadcast_message(game, "response_type=timeout&status_code=200&message=Timeout reached\n")
 			return false
 		default:
 			fmt.Println("Sleeping for 5 seconds...")
@@ -141,7 +154,10 @@ func (game *Game) wait_for_all_actions() bool {
 	}
 }
 
-func set_player_action(player *Player, action string) {
+func set_player_action(player *Player, message string) {
+
+	// action&action_type=shoot
+	action := message[len("action&action_type="):]
 
 	fmt.Println("Setting player action:", action)
 
@@ -149,7 +165,7 @@ func set_player_action(player *Player, action string) {
 	player.mutex.Lock()
 	defer player.mutex.Unlock()
 
-	player.player_state.action = action
+	player.player_state.action = strings.ToUpper(action)
 
 }
 
@@ -261,10 +277,20 @@ func (game *Game) check_player_health() {
 			game.player_dead(player)
 		} else {
 			fmt.Printf("Player %s: Health=%d, Ammo=%d\n", player.name, player.player_state.health, player.player_state.ammo)
-			player.conn.Write([]byte(fmt.Sprintf("response_type=player_health&status_code=200&message=Health=%d, Ammo=%d\n", player.player_state.health, player.player_state.ammo)))
 		}
 		player.mutex.Unlock()
 	}
+
+}
+
+func get_player_state(player *Player) {
+
+	fmt.Println("Getting player state...")
+
+	player.mutex.Lock()
+	defer player.mutex.Unlock()
+
+	player.conn.Write([]byte(fmt.Sprintf("response_type=player_state&status_code=200&message=Health=%d, Ammo=%d\n", player.player_state.health, player.player_state.ammo)))
 
 }
 
@@ -275,7 +301,7 @@ func (game *Game) player_dead(player *Player) {
 	game.game_state = "over"
 
 	// Send a response to the player
-	player.conn.Write([]byte("response_type=player_dead&status_code=200&message=You are dead\n"))
+	player.conn.Write([]byte("response_type=player_state&status_code=200&message=Dead\n"))
 
 }
 
@@ -343,7 +369,7 @@ func exit_game(player *Player) {
 	fmt.Println("Exiting the game...")
 
 	// Send a confirmation response to the player
-	player.conn.Write([]byte("response_type=exit&status_code=200&message=Goodbye\n"))
+	// player.conn.Write([]byte("response_type=exit&status_code=200&message=Goodbye\n"))
 
 	// Close the connection
 	player.conn.Close()
