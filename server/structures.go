@@ -15,6 +15,7 @@ type Player struct {
 	conn         net.Conn
 	name         string
 	player_state PlayerState
+	game         *Game
 	mutex        sync.Mutex
 }
 
