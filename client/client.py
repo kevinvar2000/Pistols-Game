@@ -1,7 +1,7 @@
 import time
 import socket
 import threading
-from const import BUFFER_SIZE
+from const import BUFFER_SIZE, PING_INTERVAL, REQUEST_INTERVAL
 
 class Client:
 
@@ -10,7 +10,7 @@ class Client:
         self.socket = None
         self.server_ip = None
         self.server_port = None
-        self.pinging = False
+        self.lock = threading.Lock()
 
 
     def connect(self):
@@ -19,14 +19,12 @@ class Client:
             self.socket.connect((self.server_ip, self.server_port))
             print(f"Connected to server at {self.server_ip}:{self.server_port}")
 
-            self.pinging = True
-            self.ping_thread = threading.Thread(target=self.ping, daemon=True).start()
+            threading.Thread(target=self.ping, daemon=True).start()
 
             return True
         except Exception as e:
             print(f"Failed to connect to server: {e}")
             self.socket = None
-            self.pinging = False
             return False
     
 
@@ -35,72 +33,63 @@ class Client:
         self.server_port = port
 
 
-    def send_request(self, request):
-        try:
-            if not self.socket:
-                raise ConnectionError("Not connected to the server.")
+    def send_request(self, request, request_type):
+        with self.lock:
+            try:
+                if not self.socket:
+                    raise ConnectionError("Not connected to the server.")
 
-            print(f"Sending request: {request}")
+                print(f"Sending request: {request}")
+                self.socket.sendall(request.encode('utf-8'))
 
-            # Serialize the request as JSON
-            self.socket.sendall(request.encode('utf-8'))
+                # Wait for the correct response type
+                while True:
+                    response_data = self.socket.recv(BUFFER_SIZE).decode('utf-8')
+                    # print(f"Received raw response: {response_data}")
 
-            # Receive the response
-            response_data = self.socket.recv(BUFFER_SIZE).decode('utf-8')
-            print(f"Response data: {response_data}")
+                    if not response_data:
+                        print("No data received. Retrying...")
+                        time.sleep(REQUEST_INTERVAL)  # Wait briefly before retrying
+                        continue
+                
+                    response = self.parse_response(response_data)
+                    print(f"Parsed response: {response}")
 
-            return  self.parse_response(response_data)
-        except Exception as e:
-            print(f"Error sending request: {e}")
-            return {"status": "error", "message": str(e)}
+                    if response.get("response_type") == request_type:
+                        return response
 
-    def receive_response(self):
-        try:
-            if not self.socket:
-                raise ConnectionError("Not connected to the server.")
+                    print(f"Ignored unrelated response: {response}")
+                    time.sleep(REQUEST_INTERVAL)
+            except Exception as e:
+                print(f"Error sending request: {e}")
+                # self.connect()
+                return {"status": "error", "message": str(e)}
 
-            response_data = self.socket.recv(BUFFER_SIZE).decode('utf-8')
-
-            print(f"Received raw response: {response_data}")
-
-            if not response_data:
-                raise ValueError("Empty response received from the server.")
-
-            return self.parse_response(response_data)
-        except Exception as e:
-            print(f"Error receiving response: {e}")
-            return {"status": "error", "message": str(e)}
 
     def parse_response(self, response_data):
         response = {}
         pairs = response_data.split("&")
         for pair in pairs:
+            if "=" not in pair:
+                print(f"Malformed pair ignored: {pair}")
+                continue
             key, value = pair.split("=", 1)
             response[key] = value
         return response
-
+    
 
     def ping(self):
-        while self.pinging:
+        while True:
             try:
-                response = self.send_request("request_type=ping")
-                if response.get("response_type") != "ping" or response.get("status_code") != "200":
-                    print("Failed to ping the server. Stopping ping.")
-                    self.pinging = False
-                    break
+                response = self.send_request("request_type=ping", "ping")
+                print(f"Ping response: {response}")
             except Exception as e:
                 print(f"Ping failed: {e}")
-                self.pinging = False
                 break
-            time.sleep(5)
-
-    def is_game_ready(self):
-        response = self.send_request("request_type=game_ready")
-        return response
+            time.sleep(PING_INTERVAL)
 
 
     def close(self):
-        self.pinging = False
         if self.socket:
             try:
                 self.socket.close()
