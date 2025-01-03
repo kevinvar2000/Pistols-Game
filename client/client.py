@@ -34,6 +34,9 @@ class Client:
 
 
     def send_request(self, request, request_type):
+        MAX_RETRIES = 10  # Maximum attempts to get the expected response
+        retries = 0
+
         with self.lock:
             try:
                 if not self.socket:
@@ -43,12 +46,13 @@ class Client:
                 self.socket.sendall(request.encode('utf-8'))
 
                 # Wait for the correct response type
-                while True:
+                while retries < MAX_RETRIES:
                     response_data = self.socket.recv(BUFFER_SIZE).decode('utf-8')
                     # print(f"Received raw response: {response_data}")
 
                     if not response_data:
                         print("No data received. Retrying...")
+                        retries += 1
                         time.sleep(REQUEST_INTERVAL)  # Wait briefly before retrying
                         continue
                 
@@ -59,7 +63,20 @@ class Client:
                         return response
 
                     print(f"Ignored unrelated response: {response}")
+                    retries += 1
                     time.sleep(REQUEST_INTERVAL)
+
+                    print(f"Retrying request {retries}/{MAX_RETRIES}...")
+
+                    # Optionally, track unrelated responses for analysis
+                    with open("unrelated_responses.log", "a") as log_file:
+                        print(f"Ignored unrelated response: {response}", file=log_file)
+                        log_file.write(f"{response}\n")
+
+                    print("After writing to log file")
+
+                # If maximum retries are exceeded
+                raise TimeoutError("Did not receive the expected response in time.")
             except Exception as e:
                 print(f"Error sending request: {e}")
                 # self.connect()
