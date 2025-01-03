@@ -88,6 +88,8 @@ func handle_connection(conn net.Conn) {
 				game_ready(player)
 			case strings.HasPrefix(request, "player_state"):
 				get_player_state(player)
+			case strings.HasPrefix(request, "opponent_state"):
+				get_opponent_state(player)
 			case strings.HasPrefix(request, "exit_game"):
 				exit_game(player)
 			case strings.HasPrefix(request, "action"):

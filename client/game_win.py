@@ -175,6 +175,11 @@ class GameWindow:
         self.ammo_label = tk.Label(self.root, text="Ammo: Loading...", font=LABEL_FONT)
         self.ammo_label.pack(pady=10)
 
+        # Opponent's Health display
+        self.opponent_health_label = tk.Label(self.root, text="Opponent Health: Loading...", font=LABEL_FONT)
+        self.opponent_health_label.pack(pady=5)
+    
+        # Info and Error labels
         self.info_label = tk.Label(self.root, text="Choose an action:", font=LABEL_FONT)
         self.info_label.pack(pady=10)
 
@@ -193,7 +198,6 @@ class GameWindow:
 
         # Start fetching the player state asynchronously
         self.root.after(0, self.get_player_state)
-        # self.update_labels()
 
 
     def get_player_state(self):
@@ -223,7 +227,7 @@ class GameWindow:
                         self.ammo = int(state_pairs.get("Ammo", 0))
                         print(f"Updated player state: Health={self.health}, Ammo={self.ammo}")
 
-                        self.update_labels()
+                        self.update_labels(self.health, self.ammo)
 
                     except (ValueError, KeyError) as e:
                         print(f"Error parsing player state: {e}")
@@ -248,10 +252,66 @@ class GameWindow:
             self.root.after(REQUEST_INTERVAL, self.get_player_state)
             return        
         
+        # Get the opponent state
+        self.get_opponent_state()
+        
         # Check the game result
         self.check_game_result()
 
-    
+
+    def get_opponent_state(self):
+        
+        print("*** Getting opponent state ***")
+
+        response = self.client.send_request("request_type=opponent_state", "opponent_state")
+        print(f"Response in get_opponent_state: {response}")
+
+        if response.get("response_type") == "opponent_state":
+            if response.get("status_code") == "200":
+                state_message = response.get("message").strip()
+                print(f"Opponent state: {state_message}")
+
+                if state_message == "Dead":
+                    print("Opponent is dead. Ending game...")
+
+                    # Update the labels
+                    self.opponent_health_label.config(text="Opponent Health: 0")
+                    self.info_label.config(text="Opponent is dead. You win!")
+                    self.root.update_idletasks()
+                else:
+                    try:
+                        state_pairs = dict(pair.split("=") for pair in state_message.split(", "))
+                        opponent_health = int(state_pairs.get("Health", 0))
+                        print(f"Updated opponent state: Health={opponent_health}")
+
+                        # Update the labels
+                        self.opponent_health_label.config(text=f"Opponent Health: {opponent_health}")
+
+                        # Update opponent state
+                        self.update_labels(opponent_health=opponent_health)
+
+                    except (ValueError, KeyError) as e:
+                        print(f"Error parsing opponent state: {e}")
+                        self.error_label.config(text="Error parsing opponent state")
+                        self.root.after(REQUEST_INTERVAL, self.get_opponent_state)
+                        return
+
+            else:
+                print(f"Failed to get opponent state: {response.get('message')}")
+                self.error_label.config(text=response.get("message"))
+                self.root.after(REQUEST_INTERVAL, self.get_opponent_state)
+                return
+
+        elif response.get("response_type") == "game_ready":
+            print("Received 'game_ready' during opponent state check. Retrying...")
+            self.root.after(REQUEST_INTERVAL, self.get_opponent_state)
+            return
+
+        else:
+            print(f"Ignoring unrelated response: {response}")
+            self.root.after(REQUEST_INTERVAL, self.get_opponent_state)
+
+
     def check_game_result(self):
 
         print("*** Checking game result ***")
@@ -304,31 +364,31 @@ class GameWindow:
             self.close_window()
 
 
-    def update_labels(self):
+    def update_labels(self, health=None, ammo=None, opponent_health=None):
 
         print("*** Updating labels ***")
 
-        # Print current label texts
-        print(f"Current Health Label: {self.health_label.cget('text')}")
-        print(f"Current Ammo Label: {self.ammo_label.cget('text')}")
+        if health is not None:
+            print(f"Updating health: {health}")
+            self.health_label.config(text=f"Health: {health}")
+        if ammo is not None:
+            print(f"Updating ammo: {ammo}")
+            self.ammo_label.config(text=f"Ammo: {ammo}")
+        if opponent_health is not None:
+            print(f"Updating opponent health: {opponent_health}")
+            self.opponent_health_label.config(text=f"Opponent Health: {opponent_health}")
+        
+        self.root.update()
+        self.root.update_idletasks()
 
-        print(f"Self health: {self.health}, Self ammo: {self.ammo}")
 
-        # Update health and ammo labels
-        self.health_label.config(text=f"Health: {self.health}")
-        self.ammo_label.config(text=f"Ammo: {self.ammo}")
-
-        # Force the GUI to update the display
-        self.root.update()  # This forces an immediate update of the UI
-        self.root.update_idletasks()  # Ensures any pending tasks are processed
-
-        # Print updated label texts
-        print(f"Updated Health Label: {self.health_label.cget('text')}")
-        print(f"Updated Ammo Label: {self.ammo_label.cget('text')}")
 
     def close_window(self):
 
         print("*** Closing game window ***")
 
-        self.client.close()
+        try:
+            self.client.close()
+        except Exception as e:
+            print(f"Error closing client: {e}")
         self.root.destroy()

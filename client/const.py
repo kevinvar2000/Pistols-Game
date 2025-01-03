@@ -5,7 +5,7 @@ PING_INTERVAL = 3        # Time in seconds between pings
 REQUEST_INTERVAL = 1000  # Time in milliseconds between requests
 
 # Window constants
-WIN_SIZE = "400x400"                 # Default window size
+WIN_SIZE = "600x600"                 # Default window size
 TITLE_FONT = ("Arial", 16)           # Default font style
 BUTTON_FONT = ("Arial", 14)          # Default font style
 LABEL_FONT = ("Arial", 14)           # Default font style

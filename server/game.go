@@ -305,6 +305,30 @@ func get_player_state(player *Player) {
 	}
 }
 
+func get_opponent_state(player *Player) {
+
+	fmt.Println("Getting opponent state for player:", player.name)
+
+	player.mutex.Lock()
+	defer player.mutex.Unlock()
+
+	for opponent := range player.game.players {
+		if opponent != player {
+			opponent.mutex.Lock()
+			defer opponent.mutex.Unlock()
+
+			if opponent.player_state.is_dead {
+				fmt.Printf("Opponent %s is dead.\n", opponent.name)
+				player.conn.Write([]byte("response_type=opponent_state&status_code=200&message=Dead\n"))
+			} else {
+				fmt.Printf("Opponent %s: Health=%d\n", opponent.name, opponent.player_state.health)
+				player.conn.Write([]byte(fmt.Sprintf("response_type=opponent_state&status_code=200&message=Health=%d\n", opponent.player_state.health)))
+			}
+		}
+	}
+
+}
+
 func (game *Game) player_dead(player *Player) {
 
 	fmt.Println("Player", player.name, "is dead...")
