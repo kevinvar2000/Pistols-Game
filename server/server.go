@@ -58,7 +58,7 @@ func handle_connection(conn net.Conn) {
 
 		// Trim the message of any leading or trailing spaces
 		message = strings.TrimSpace(message)
-		fmt.Println("Received message:", message)
+		// fmt.Println("Received message:", message)
 
 		// Check if the message is empty
 		if len(message) == 0 {
@@ -72,35 +72,38 @@ func handle_connection(conn net.Conn) {
 		}
 
 		// Trim the message of the request_type prefix
-		message = strings.TrimPrefix(message, "request_type=")
+		request := strings.TrimPrefix(message, "request_type=")
 
-		if strings.HasPrefix(message, "ping") {
+		if strings.HasPrefix(request, "ping") {
 			ping(conn)
 			continue
 		}
 
 		if is_registered {
 
-			fmt.Println("Message received from registered player:", player.name)
-			fmt.Println("Message:", message)
+			fmt.Printf("Player %s sent request: %s\n", player.name, request)
 
 			switch {
-			case strings.HasPrefix(message, "game_ready"):
+			case strings.HasPrefix(request, "game_ready"):
 				game_ready(player)
-			case strings.HasPrefix(message, "player_state"):
+			case strings.HasPrefix(request, "player_state"):
 				get_player_state(player)
-			case strings.HasPrefix(message, "exit_game"):
+			case strings.HasPrefix(request, "exit_game"):
 				exit_game(player)
-			case strings.HasPrefix(message, "action"):
-				set_player_action(player, message)
+			case strings.HasPrefix(request, "action"):
+				set_player_action(player, request)
 				conn.Write([]byte("response_type=action&status_code=200&message=Action set\n"))
+			case strings.HasPrefix(request, "game_result"):
+				get_game_result(player)
+			case strings.HasPrefix(request, "round_state"):
+				get_round_state(player)
 			default:
 				invalid_message(player)
 			}
 		} else {
 			// If the player is not registered, allow only "name:" message for registration
-			if strings.HasPrefix(message, "name") {
-				player = register_player(conn, message)
+			if strings.HasPrefix(request, "name") {
+				player = register_player(conn, request)
 				is_registered = true
 
 				go wait_for_players(player)
@@ -114,9 +117,9 @@ func handle_connection(conn net.Conn) {
 
 }
 
-func register_player(conn net.Conn, message string) *Player {
+func register_player(conn net.Conn, request string) *Player {
 
-	player_name := strings.TrimPrefix(message, "name&name=")
+	player_name := strings.TrimPrefix(request, "name&name=")
 	fmt.Println("Registering player:", player_name)
 	conn.Write([]byte("response_type=name&status_code=200&message=Player registered\n"))
 
@@ -143,18 +146,4 @@ func ping(conn net.Conn) {
 
 	fmt.Println("Pinging player...")
 	conn.Write([]byte("response_type=ping&status_code=200&message=Pong\n"))
-}
-
-func broadcast_message(game *Game, message string) {
-
-	game.mutex.Lock()
-	for player := range game.players {
-
-		if player.conn == nil {
-			continue
-		}
-
-		player.conn.Write([]byte(message))
-	}
-	game.mutex.Unlock()
 }
