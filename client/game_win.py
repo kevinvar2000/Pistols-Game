@@ -1,10 +1,12 @@
 import tkinter as tk
-from const import WIN_SIZE, BUTTON_FONT, LABEL_FONT
+from tkinter import messagebox
+from const import WIN_SIZE, BUTTON_FONT, LABEL_FONT, REQUEST_INTERVAL
 
 class GameWindow:
     def __init__(self, root, client, client_name):
         self.client = client
         self.client_name = client_name
+        self.timeout = False
 
         self.root = root
         self.root.title("Game")
@@ -16,19 +18,24 @@ class GameWindow:
 
 
     def send_action(self, action):
+
+        self.disable_actions()
+
+        print(f"*** Sending action: {action} ***")
+
         response = self.client.send_request(action, "action")
         print(f"Response in send_action: {response}")
 
         if response.get("response_type") == "action":
             if response.get("status_code") == "200":
-                self.get_player_state()
+                self.check_round_state()
             else:
                 print(f"Failed to send action: {response.get('message')}")
                 self.error_label.config(text=response.get("message"))
-                self.root.after(1000, lambda: self.send_action(action))
+                self.root.after(REQUEST_INTERVAL, lambda: self.send_action(action))
         else:
             print(f"Ignoring unrelated response: {response}")
-            self.root.after(1000, lambda: self.send_action(action))
+            self.root.after(REQUEST_INTERVAL, lambda: self.send_action(action))
 
 
     def shoot(self):
@@ -43,7 +50,33 @@ class GameWindow:
         self.send_action("request_type=action&action_type=cover")
 
 
+    def disable_actions(self):
+
+        print("*** Disabling actions ***")
+
+        self.info_label.config(text="Waiting for response...")
+
+        for widget in self.root.winfo_children():
+            widget.config(state=tk.DISABLED)
+
+        self.root.update_idletasks()
+
+    def enable_actions(self):
+
+        print("*** Enabling actions ***")
+
+        self.info_label.config(text="Choose an action:")
+
+        for widget in self.root.winfo_children():
+            widget.config(state=tk.NORMAL)
+
+        self.root.update_idletasks()
+
+
     def waiting_room(self):
+
+        print("*** Waiting room ***")
+
         # Clear the current window
         for widget in self.root.winfo_children():
             widget.destroy()
@@ -59,8 +92,9 @@ class GameWindow:
 
 
     def check_game_ready(self):
-        print(f"Waiting for game to be ready...")
-        
+
+        print("*** Checking if game is ready ***")
+
         # Send a request to check if the game is ready
         response = self.client.send_request("request_type=game_ready", "game_ready")
 
@@ -73,13 +107,58 @@ class GameWindow:
                 self.load_game()
             else:
                 print(f"Game not ready: {response.get('message')}")
-                self.root.after(1000, self.check_game_ready)
+                self.root.after(2000, self.check_game_ready)
         else:
             print(f"Ignoring unrelated response: {response}")
-            self.root.after(1000, self.check_game_ready)
+            self.root.after(2000, self.check_game_ready)
+
+    
+    def check_round_state(self):
+        
+        print("*** Checking round state ***")
+
+        response = self.client.send_request("request_type=round_state", "round_state")
+        print(f"Response in check_round_state: {response}")
+
+        if response.get("response_type") == "round_state":
+            if response.get("status_code") == "200":
+                state_message = response.get("message").strip()
+                print(f"Round state: {state_message}")
+
+                if state_message == "Running":
+                    print("Round is still running. Checking again shortly...")
+                    self.timeout_handled = False
+                    self.root.after(REQUEST_INTERVAL, self.check_round_state)
+                elif state_message == "Timeout":
+                    print("Round timed out.")
+                    if not self.timeout:
+                        print("Sending a reload action...")
+                        self.timeout = True
+                        self.error_label.config(text="Round timed out. Sending a reload action...")
+                        self.reload()
+                    else:
+                        print("Timeout already handled. Waiting for the next update.")
+                        self.root.after(REQUEST_INTERVAL, self.check_round_state)
+
+                elif state_message == "End":
+                    print("Round ended. Processing results...")
+                    self.timeout_handled = False
+                    self.get_player_state()
+                    self.enable_actions()
+
+            else:
+                print(f"Failed to get round state: {response.get('message')}")
+                self.error_label.config(text=response.get("message"))
+                self.root.after(REQUEST_INTERVAL, self.check_round_state)
+        else:
+            print(f"Ignoring unrelated response: {response}")
+            self.root.after(REQUEST_INTERVAL, self.check_round_state)
 
 
     def load_game(self):
+
+        print("*** Loading game window ***")
+
         # Clear the current window
         for widget in self.root.winfo_children():
             widget.destroy()
@@ -103,10 +182,6 @@ class GameWindow:
         self.error_label.pack(pady=10)
 
 
-        # Get the initial player state
-        self.get_player_state()
-
-
         # Buttons for actions
         tk.Button(self.root, text="Shoot", font=BUTTON_FONT, command=self.shoot).pack(pady=5)
         tk.Button(self.root, text="Reload", font=BUTTON_FONT, command=self.reload).pack(pady=5)
@@ -114,10 +189,17 @@ class GameWindow:
 
         self.root.protocol("WM_DELETE_WINDOW", self.close_window)
 
-        self.update_labels()
-        self.root.mainloop()
+        print("Starting the game...")
+
+        # Start fetching the player state asynchronously
+        self.root.after(0, self.get_player_state)
+        # self.update_labels()
+
 
     def get_player_state(self):
+
+        print("*** Getting player state ***")
+
         response = self.client.send_request("request_type=player_state", "player_state")
         print(f"Response in get_player_state: {response}")
 
@@ -134,35 +216,119 @@ class GameWindow:
                     self.ammo_label.config(text="Ammo: 0")
                     self.info_label.config(text="You are dead. Game over.")
                     self.root.update_idletasks()
-                    return
+                else:
+                    try:
+                        state_pairs = dict(pair.split("=") for pair in state_message.split(", "))
+                        self.health = int(state_pairs.get("Health", 0))
+                        self.ammo = int(state_pairs.get("Ammo", 0))
+                        print(f"Updated player state: Health={self.health}, Ammo={self.ammo}")
 
-                try:
-                    state_pairs = dict(pair.split("=") for pair in state_message.split(", "))
-                    self.health = int(state_pairs.get("Health", 0))
-                    self.ammo = int(state_pairs.get("Ammo", 0))
-                    print(f"Updated player state: Health={self.health}, Ammo={self.ammo}")
+                        self.update_labels()
 
-                    # Update the labels
-                    self.health_label.config(text=f"Health: {self.health}")
-                    self.ammo_label.config(text=f"Ammo: {self.ammo}")
-                    self.root.update_idletasks()
-                except (ValueError, KeyError) as e:
-                    print(f"Error parsing player state: {e}")
-                    self.error_label.config(text="Error parsing player state")
+                    except (ValueError, KeyError) as e:
+                        print(f"Error parsing player state: {e}")
+                        self.error_label.config(text="Error parsing player state")
+                        self.root.after(REQUEST_INTERVAL, self.get_player_state)
+                        return
 
             else:
                 print(f"Failed to get player state: {response.get('message')}")
                 self.error_label.config(text=response.get("message"))
-                self.root.after(1000, self.get_player_state)
+                self.root.after(REQUEST_INTERVAL, self.get_player_state)
+                return
+
+            
+        elif response.get("response_type") == "game_ready":
+            print("Received 'game_ready' during player state check. Retrying...")
+            self.root.after(REQUEST_INTERVAL, self.get_player_state)
+            return
+
         else:
             print(f"Ignoring unrelated response: {response}")
-            self.root.after(1000, self.get_player_state)
+            self.root.after(REQUEST_INTERVAL, self.get_player_state)
+            return        
+        
+        # Check the game result
+        self.check_game_result()
+
+    
+    def check_game_result(self):
+
+        print("*** Checking game result ***")
+
+        response = self.client.send_request("request_type=game_result", "game_result")
+        print(f"Response in check_game_result: {response}")
+
+        if response.get("response_type") == "game_result":
+            if response.get("status_code") == "200":
+                result_message = response.get("message").strip()
+                print(f"Game result: {result_message}")
+
+                if result_message == "Win":
+                    print("You win! Congratulations!")
+                    self.info_label.config(text="You win! Congratulations!")
+                    result_message = "You win! Congratulations!"
+                elif result_message == "Lose":
+                    print("You lose! Better luck next time!")
+                    self.info_label.config(text="You lose! Better luck next time!")
+                    result_message = "You lose! Better luck next time!"
+                elif result_message == "Draw":
+                    print("Game ended in a draw.")
+                    self.info_label.config(text="Game ended in a draw.")
+                    result_message = "Game ended in a draw."
+
+                self.root.update_idletasks()
+
+                # Ask player to play again or quit
+                self.ask_play_again(result_message)
+
+            elif response.get("status_code") == "400":
+                print("Game is still running...")
+            else:
+                print(f"Failed to get game result: {response.get('message')}")
+                self.error_label.config(text=response.get("message"))
+                self.root.after(2000, self.check_game_result)
+        else:
+            print(f"Ignoring unrelated response: {response}")
+            self.root.after(2000, self.check_game_result)
+
+
+    def ask_play_again(self, result_message):
+        result = messagebox.askquestion("Game Over", f"{result_message}\nDo you want to play again?", icon='question')
+
+        if result == 'yes':
+            print("Player chose to play again. Returning to the waiting room...")
+            self.waiting_room()
+        else:
+            print("Player chose to quit. Closing the game...")
+            self.close_window()
 
 
     def update_labels(self):
-        self.get_player_state()
-        self.root.after(1000, self.update_labels)
+
+        print("*** Updating labels ***")
+
+        # Print current label texts
+        print(f"Current Health Label: {self.health_label.cget('text')}")
+        print(f"Current Ammo Label: {self.ammo_label.cget('text')}")
+
+        print(f"Self health: {self.health}, Self ammo: {self.ammo}")
+
+        # Update health and ammo labels
+        self.health_label.config(text=f"Health: {self.health}")
+        self.ammo_label.config(text=f"Ammo: {self.ammo}")
+
+        # Force the GUI to update the display
+        self.root.update()  # This forces an immediate update of the UI
+        self.root.update_idletasks()  # Ensures any pending tasks are processed
+
+        # Print updated label texts
+        print(f"Updated Health Label: {self.health_label.cget('text')}")
+        print(f"Updated Ammo Label: {self.ammo_label.cget('text')}")
 
     def close_window(self):
+
+        print("*** Closing game window ***")
+
         self.client.close()
         self.root.destroy()
