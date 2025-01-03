@@ -6,9 +6,10 @@ import (
 )
 
 type Game struct {
-	players    map[*Player]bool
-	game_state string
-	mutex      *sync.Mutex
+	players     map[*Player]bool
+	game_state  string
+	round_state string
+	mutex       *sync.Mutex
 }
 
 type Player struct {
@@ -20,7 +21,8 @@ type Player struct {
 }
 
 type PlayerState struct {
-	health int
-	ammo   int
-	action string
+	health  int
+	ammo    int
+	action  string
+	is_dead bool
 }
