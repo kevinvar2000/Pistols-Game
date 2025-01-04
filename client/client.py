@@ -107,13 +107,14 @@ class Client:
 
 
     def close(self):
-        if self.socket:
-            try:
-                self.socket.close()
-                print("Connection closed.")
-            except Exception as e:
-                print(f"Error while closing the socket: {e}")
-            finally:
-                self.socket = None
+
+        response = self.send_request("request_type=close", "close")
+        print(f"Close response: {response}")
+
+        if response.get("response_type") == "close":
+            if response.get("status") == "200":
+                print("Server closed the connection.")
+            else:
+                print("Failed to close the connection.")
         else:
-            print("No connection to close.")
+            print("Unexpected response while closing the connection.")
