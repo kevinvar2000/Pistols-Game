@@ -204,6 +204,8 @@ class GameWindow:
 
         print("*** Getting player state ***")
 
+        dead = False
+
         response = self.client.send_request("request_type=player_state", "player_state")
         print(f"Response in get_player_state: {response}")
 
@@ -214,6 +216,8 @@ class GameWindow:
 
                 if state_message == "Dead":
                     print("Player is dead. Ending game...")
+
+                    dead = True
 
                     # Update the labels
                     self.health_label.config(text="Health: 0")
@@ -252,9 +256,10 @@ class GameWindow:
             self.root.after(REQUEST_INTERVAL, self.get_player_state)
             return        
         
-        # Get the opponent state
-        self.get_opponent_state()
-        
+        # Get the opponent state if player is not dead
+        if not dead:
+            self.get_opponent_state()
+
         # Check the game result
         self.check_game_result()
 
@@ -340,7 +345,7 @@ class GameWindow:
                 self.root.update_idletasks()
 
                 # Ask player to play again or quit
-                self.ask_play_again(result_message)
+                self.root.after(2000, lambda: self.ask_play_again(result_message))
 
             elif response.get("status_code") == "400":
                 print("Game is still running...")
@@ -387,8 +392,23 @@ class GameWindow:
 
         print("*** Closing game window ***")
 
+        # Cancel all pending callbacks
+        try:
+            self.root.after_cancel(self.get_player_state)
+            self.root.after_cancel(self.get_opponent_state)
+            self.root.after_cancel(self.check_game_result)
+            self.root.after_cancel(self.check_round_state)
+        except Exception as e:
+            print(f"Error cancelling callbacks: {e}")
+        else:
+            print("Callbacks cancelled successfully.")
+
+        # Close the client connection
         try:
             self.client.close()
         except Exception as e:
             print(f"Error closing client: {e}")
+        else:
+            print("Client closed successfully.")
+
         self.root.destroy()
