@@ -204,8 +204,6 @@ class GameWindow:
 
         print("*** Getting player state ***")
 
-        dead = False
-
         response = self.client.send_request("request_type=player_state", "player_state")
         print(f"Response in get_player_state: {response}")
 
@@ -216,8 +214,6 @@ class GameWindow:
 
                 if state_message == "Dead":
                     print("Player is dead. Ending game...")
-
-                    dead = True
 
                     # Update the labels
                     self.health_label.config(text="Health: 0")
@@ -256,9 +252,6 @@ class GameWindow:
             self.root.after(REQUEST_INTERVAL, self.get_player_state)
             return        
         
-        # Get the opponent state if player is not dead
-        if not dead:
-            self.get_opponent_state()
 
         # Check the game result
         self.check_game_result()
@@ -348,7 +341,8 @@ class GameWindow:
                 self.root.after(2000, lambda: self.ask_play_again(result_message))
 
             elif response.get("status_code") == "400":
-                print("Game is still running...")
+                print("Game is still running... Fetching opponent state.")
+                self.get_opponent_state()
             else:
                 print(f"Failed to get game result: {response.get('message')}")
                 self.error_label.config(text=response.get("message"))
