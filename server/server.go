@@ -92,6 +92,7 @@ func handle_connection(conn net.Conn) {
 				get_opponent_state(player)
 			case strings.HasPrefix(request, "close"):
 				close_game(player)
+				return
 			case strings.HasPrefix(request, "action"):
 				set_player_action(player, request)
 				conn.Write([]byte("response_type=action&status_code=200&message=Action set\n"))

@@ -476,6 +476,24 @@ func close_game(player *Player) {
 
 	fmt.Println("Exiting the game...")
 
+	player.mutex.Lock()
+	defer player.mutex.Unlock()
+
+	// Check if the player is registered
+	if player.game != nil {
+		// Remove player from the game
+		player.game.mutex.Lock()
+		delete(player.game.players, player)
+		player.game.mutex.Unlock()
+
+		// Check if the game has any players left
+		if len(player.game.players) == 0 {
+			player.game.game_state = "waiting" // Reset game state for reuse
+		}
+
+		player.game = nil
+	}
+
 	// Send a confirmation response to the player
 	player.conn.Write([]byte("response_type=close&status_code=200&message=Goodbye\n"))
 
