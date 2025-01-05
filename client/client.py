@@ -108,10 +108,10 @@ class Client:
 
     def close(self):
 
-        response = self.send_request("request_type=close", "close")
+        response = self.send_request("request_type=close_game", "close_game")
         print(f"Close response: {response}")
 
-        if response.get("response_type") == "close":
+        if response.get("response_type") == "close_game":
             if response.get("status") == "200":
                 print("Server closed the connection.")
             else:
