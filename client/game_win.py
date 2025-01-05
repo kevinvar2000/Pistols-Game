@@ -1,7 +1,7 @@
 import time
 import tkinter as tk
 from tkinter import messagebox
-from const import WIN_SIZE, BUTTON_FONT, LABEL_FONT, REQUEST_INTERVAL
+from const import WIN_SIZE, BUTTON_FONT, LABEL_FONT, REQUEST_INTERVAL, ELEMENT_SIZE
 
 class GameWindow:
     def __init__(self, root, client, client_name):
@@ -192,9 +192,9 @@ class GameWindow:
 
 
         # Buttons for actions
-        tk.Button(self.root, text="Shoot", font=BUTTON_FONT, command=self.shoot).pack(pady=5)
-        tk.Button(self.root, text="Reload", font=BUTTON_FONT, command=self.reload).pack(pady=5)
-        tk.Button(self.root, text="Cover", font=BUTTON_FONT, command=self.cover).pack(pady=5)
+        tk.Button(self.root, text="Shoot", font=BUTTON_FONT, command=self.shoot, width=ELEMENT_SIZE).pack(pady=5)
+        tk.Button(self.root, text="Reload", font=BUTTON_FONT, command=self.reload, width=ELEMENT_SIZE).pack(pady=5)
+        tk.Button(self.root, text="Cover", font=BUTTON_FONT, command=self.cover, width=ELEMENT_SIZE).pack(pady=5)
 
         self.root.protocol("WM_DELETE_WINDOW", self.close_window)
 

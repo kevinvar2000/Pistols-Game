@@ -1,6 +1,6 @@
 import tkinter as tk
 from game_win import GameWindow
-from const import WIN_SIZE, TITLE_FONT, BUTTON_FONT, INPUT_FONT, ERROR_FONT, LABEL_FONT
+from const import WIN_SIZE, TITLE_FONT, BUTTON_FONT, INPUT_FONT, ERROR_FONT, ELEMENT_SIZE
 
 class MenuWindow:
 
@@ -14,10 +14,10 @@ class MenuWindow:
         self.root.resizable(False, False)
 
         # Title
-        tk.Label(self.root, text="Welcome to the Game!", font=TITLE_FONT).pack(pady=20)
+        tk.Label(self.root, text="Welcome to the Game!", font=TITLE_FONT).pack(pady=50)
 
         # Name input field
-        tk.Label(self.root, text="Enter your name:", font=INPUT_FONT).pack(pady=5)
+        tk.Label(self.root, text="Enter your name:", font=INPUT_FONT).pack(pady=15)
         self.name_entry = tk.Entry(self.root, font=INPUT_FONT)
         self.name_entry.pack(pady=5)
 
@@ -26,8 +26,8 @@ class MenuWindow:
         self.error_label.pack(pady=10)
 
         # Buttons
-        tk.Button(self.root, text="Play", font=BUTTON_FONT, command=self.play).pack(pady=10)
-        tk.Button(self.root, text="Back", font=BUTTON_FONT, command=self.back).pack(pady=10)
+        tk.Button(self.root, text="Play", font=BUTTON_FONT, command=self.play, width=ELEMENT_SIZE).pack(pady=10)
+        tk.Button(self.root, text="Back", font=BUTTON_FONT, command=self.back , width=ELEMENT_SIZE).pack(pady=10)
 
 
     def play(self):

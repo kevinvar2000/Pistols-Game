@@ -1,7 +1,7 @@
 import tkinter as tk
 from client import Client
 from menu_win import MenuWindow
-from const import SERVER_IP, SERVER_PORT, WIN_SIZE, TITLE_FONT, BUTTON_FONT, INPUT_FONT, ERROR_FONT
+from const import SERVER_IP, SERVER_PORT, WIN_SIZE, TITLE_FONT, BUTTON_FONT, INPUT_FONT, ERROR_FONT, ELEMENT_SIZE
 
 class ConnectWindow:
 
@@ -18,17 +18,17 @@ class ConnectWindow:
         self.root.resizable(False, False)
 
         # Title
-        tk.Label(self.root, text="Connect to the Server", font=TITLE_FONT).pack(pady=20)
+        tk.Label(self.root, text="Connect to the Server", font=TITLE_FONT).pack(pady=50)
 
         # Server input field
-        tk.Label(self.root, text="Server IP:", font=INPUT_FONT).pack(pady=5)
-        self.server_ip_entry = tk.Entry(self.root, font=INPUT_FONT)
+        tk.Label(self.root, text="Server IP:", font=INPUT_FONT).pack(pady=15)
+        self.server_ip_entry = tk.Entry(self.root, font=INPUT_FONT, width=ELEMENT_SIZE)
         self.server_ip_entry.pack(pady=5)
         self.server_ip_entry.insert(0, SERVER_IP)
 
         # Server port input field
-        tk.Label(self.root, text="Server Port:", font=INPUT_FONT).pack(pady=5)
-        self.server_port_entry = tk.Entry(self.root, font=INPUT_FONT)
+        tk.Label(self.root, text="Server Port:", font=INPUT_FONT).pack(pady=15)
+        self.server_port_entry = tk.Entry(self.root, font=INPUT_FONT, width=ELEMENT_SIZE)
         self.server_port_entry.pack(pady=5)
         self.server_port_entry.insert(0, SERVER_PORT)
 
@@ -37,8 +37,8 @@ class ConnectWindow:
         self.error_label.pack(pady=10)
 
         # Buttons
-        tk.Button(self.root, text="Connect", font=BUTTON_FONT, command=self.connect_and_start).pack(pady=10)
-        tk.Button(self.root, text="Quit", font=BUTTON_FONT, command=self.quit).pack(pady=10)
+        tk.Button(self.root, text="Connect", font=BUTTON_FONT, command=self.connect_and_start, width=ELEMENT_SIZE).pack(pady=10)
+        tk.Button(self.root, text="Quit", font=BUTTON_FONT, command=self.quit, width=ELEMENT_SIZE).pack(pady=10)
 
     def connect_and_start(self):
         try:
