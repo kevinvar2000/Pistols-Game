@@ -1,3 +1,4 @@
+import time
 import tkinter as tk
 from tkinter import messagebox
 from const import WIN_SIZE, BUTTON_FONT, LABEL_FONT, REQUEST_INTERVAL
@@ -19,6 +20,9 @@ class GameWindow:
 
     def send_action(self, action):
 
+        # Update the last action time
+        self.last_action_time = time.time()
+
         self.disable_actions()
 
         print(f"*** Sending action: {action} ***")
@@ -31,7 +35,7 @@ class GameWindow:
                 self.check_round_state()
             else:
                 print(f"Failed to send action: {response.get('message')}")
-                self.error_label.config(text=response.get("message"))
+                self.update_labels(error_message=response.get("message"))
                 self.root.after(REQUEST_INTERVAL, lambda: self.send_action(action))
         else:
             print(f"Ignoring unrelated response: {response}")
@@ -134,7 +138,7 @@ class GameWindow:
                     if not self.timeout:
                         print("Sending a reload action...")
                         self.timeout = True
-                        self.error_label.config(text="Round timed out. Sending a reload action...")
+                        self.update_labels(error_message="Round timed out. Sending a reload action...")
                         self.reload()
                     else:
                         print("Timeout already handled. Waiting for the next update.")
@@ -148,7 +152,7 @@ class GameWindow:
 
             else:
                 print(f"Failed to get round state: {response.get('message')}")
-                self.error_label.config(text=response.get("message"))
+                self.update_labels(error_message=response.get("message"))
                 self.root.after(REQUEST_INTERVAL, self.check_round_state)
         else:
             print(f"Ignoring unrelated response: {response}")
@@ -199,6 +203,25 @@ class GameWindow:
         # Start fetching the player state asynchronously
         self.root.after(0, self.get_player_state)
 
+        # Start checking for inactivity
+        self.last_action_time = time.time()
+
+        # Check for inactivity every 5 seconds
+        self.root.after(5000, self.check_inactivity)
+
+
+    def check_inactivity(self):
+
+        current_time = time.time()
+
+        if current_time - self.last_action_time > 20:
+            print("Player has been inactive for 20 seconds. Sending a reload action...")
+            self.update_labels(error_message="You have been inactive for 20 seconds. Sending a reload action...")
+            self.reload()
+            self.root.after(REQUEST_INTERVAL, lambda: self.update_labels(error_message=""))
+
+        self.root.after(5000, self.check_inactivity)
+
 
     def get_player_state(self):
 
@@ -216,10 +239,7 @@ class GameWindow:
                     print("Player is dead. Ending game...")
 
                     # Update the labels
-                    self.health_label.config(text="Health: 0")
-                    self.ammo_label.config(text="Ammo: 0")
-                    self.info_label.config(text="You are dead. Game over.")
-                    self.root.update_idletasks()
+                    self.update_labels(health=0, ammo=0, info_message="You are dead. Game over.")
                 else:
                     try:
                         state_pairs = dict(pair.split("=") for pair in state_message.split(", "))
@@ -231,13 +251,13 @@ class GameWindow:
 
                     except (ValueError, KeyError) as e:
                         print(f"Error parsing player state: {e}")
-                        self.error_label.config(text="Error parsing player state")
+                        self.update_labels(error_message="Error parsing player state")
                         self.root.after(REQUEST_INTERVAL, self.get_player_state)
                         return
 
             else:
                 print(f"Failed to get player state: {response.get('message')}")
-                self.error_label.config(text=response.get("message"))
+                self.update_labels(error_message=response.get("message"))
                 self.root.after(REQUEST_INTERVAL, self.get_player_state)
                 return
 
@@ -273,30 +293,25 @@ class GameWindow:
                     print("Opponent is dead. Ending game...")
 
                     # Update the labels
-                    self.opponent_health_label.config(text="Opponent Health: 0")
-                    self.info_label.config(text="Opponent is dead. You win!")
-                    self.root.update_idletasks()
+                    self.update_labels(opponent_health=0, info_message="Opponent is dead. You win!")
                 else:
                     try:
                         state_pairs = dict(pair.split("=") for pair in state_message.split(", "))
                         opponent_health = int(state_pairs.get("Health", 0))
                         print(f"Updated opponent state: Health={opponent_health}")
 
-                        # Update the labels
-                        self.opponent_health_label.config(text=f"Opponent Health: {opponent_health}")
-
                         # Update opponent state
                         self.update_labels(opponent_health=opponent_health)
 
                     except (ValueError, KeyError) as e:
                         print(f"Error parsing opponent state: {e}")
-                        self.error_label.config(text="Error parsing opponent state")
+                        self.update_labels(error_message="Error parsing opponent state")
                         self.root.after(REQUEST_INTERVAL, self.get_opponent_state)
                         return
 
             else:
                 print(f"Failed to get opponent state: {response.get('message')}")
-                self.error_label.config(text=response.get("message"))
+                self.update_labels(error_message=response.get("message"))
                 self.root.after(REQUEST_INTERVAL, self.get_opponent_state)
                 return
 
@@ -324,18 +339,17 @@ class GameWindow:
 
                 if result_message == "Win":
                     print("You win! Congratulations!")
-                    self.info_label.config(text="You win! Congratulations!")
                     result_message = "You win! Congratulations!"
+                    self.root.after(0, lambda: self.update_labels(opponent_health=0))
                 elif result_message == "Lose":
                     print("You lose! Better luck next time!")
-                    self.info_label.config(text="You lose! Better luck next time!")
                     result_message = "You lose! Better luck next time!"
                 elif result_message == "Draw":
                     print("Game ended in a draw.")
-                    self.info_label.config(text="Game ended in a draw.")
                     result_message = "Game ended in a draw."
 
-                self.root.update_idletasks()
+                # Update the labels
+                self.root.after(0, lambda: self.update_labels(info_message=result_message))
 
                 # Ask player to play again or quit
                 self.root.after(2000, lambda: self.ask_play_again(result_message))
@@ -345,7 +359,7 @@ class GameWindow:
                 self.get_opponent_state()
             else:
                 print(f"Failed to get game result: {response.get('message')}")
-                self.error_label.config(text=response.get("message"))
+                self.update_labels(error_message=response.get("message"))
                 self.root.after(2000, self.check_game_result)
         else:
             print(f"Ignoring unrelated response: {response}")
@@ -355,15 +369,40 @@ class GameWindow:
     def ask_play_again(self, result_message):
         result = messagebox.askquestion("Game Over", f"{result_message}\nDo you want to play again?", icon='question')
 
+        self.cancel_callbacks()
+
         if result == 'yes':
             print("Player chose to play again. Returning to the waiting room...")
-            self.waiting_room()
+            self.reset_game()
         else:
             print("Player chose to quit. Closing the game...")
             self.close_window()
 
 
-    def update_labels(self, health=None, ammo=None, opponent_health=None):
+    def reset_game(self):
+        
+        print("*** Resetting game ***")
+
+        self.timeout = False
+        self.timeout_handled = False
+
+        response = self.client.send_request("request_type=reset_game", "reset_game")
+        print(f"Response in reset_game: {response}")
+
+        if response.get("response_type") == "reset_game":
+            if response.get("status_code") == "200":
+                print("Game reset successfully.")
+                self.waiting_room()
+            else:
+                print(f"Failed to reset game: {response.get('message')}")
+                self.update_labels(error_message=response.get("message"))
+                self.root.after(REQUEST_INTERVAL, self.reset_game)
+        else:
+            print(f"Ignoring unrelated response: {response}")
+            self.root.after(REQUEST_INTERVAL, self.reset_game)
+
+
+    def update_labels(self, health=None, ammo=None, opponent_health=None, info_message=None, error_message=None):
 
         print("*** Updating labels ***")
 
@@ -376,10 +415,31 @@ class GameWindow:
         if opponent_health is not None:
             print(f"Updating opponent health: {opponent_health}")
             self.opponent_health_label.config(text=f"Opponent Health: {opponent_health}")
+        if info_message is not None:
+            print(f"Updating info label: {info_message}")
+            self.info_label.config(text=info_message)
+        if error_message is not None:
+            print(f"Updating error label: {error_message}")
+            self.error_label.config(text=error_message)
         
         self.root.update()
         self.root.update_idletasks()
 
+
+    def cancel_callbacks(self):
+        
+        print("*** Cancelling callbacks ***")
+
+        try:
+            self.root.after_cancel(self.get_player_state)
+            self.root.after_cancel(self.get_opponent_state)
+            self.root.after_cancel(self.check_game_result)
+            self.root.after_cancel(self.check_round_state)
+            self.root.after_cancel(self.check_inactivity)
+        except Exception as e:
+            print(f"Error cancelling callbacks: {e}")
+        else:
+            print("Callbacks cancelled successfully.")
 
 
     def close_window(self):
@@ -387,15 +447,7 @@ class GameWindow:
         print("*** Closing game window ***")
 
         # Cancel all pending callbacks
-        try:
-            self.root.after_cancel(self.get_player_state)
-            self.root.after_cancel(self.get_opponent_state)
-            self.root.after_cancel(self.check_game_result)
-            self.root.after_cancel(self.check_round_state)
-        except Exception as e:
-            print(f"Error cancelling callbacks: {e}")
-        else:
-            print("Callbacks cancelled successfully.")
+        self.cancel_callbacks()
 
         # Close the client connection
         try:
