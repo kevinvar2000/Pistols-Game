@@ -67,8 +67,8 @@ func handle_connection(conn net.Conn) {
 		}
 
 		if !strings.HasPrefix(message, "request_type") {
-			invalid_message(player)
-			continue
+			invalid_message(conn)
+			return
 		}
 
 		// Trim the message of the request_type prefix
@@ -103,7 +103,8 @@ func handle_connection(conn net.Conn) {
 			case strings.HasPrefix(request, "round_state"):
 				get_round_state(player)
 			default:
-				invalid_message(player)
+				invalid_message(conn)
+				return
 			}
 		} else {
 			// If the player is not registered, allow only "name:" message for registration
@@ -114,7 +115,8 @@ func handle_connection(conn net.Conn) {
 				go wait_for_players(player)
 			} else {
 				if player != nil {
-					invalid_message(player)
+					invalid_message(conn)
+					return
 				}
 			}
 		}
@@ -131,9 +133,10 @@ func register_player(conn net.Conn, request string) *Player {
 	return create_player(conn, player_name)
 }
 
-func invalid_message(player *Player) {
+func invalid_message(conn net.Conn) {
 	fmt.Println("Invalid message received.")
-	player.conn.Write([]byte("response_type=error&status_code=400&message=Invalid request\n"))
+	conn.Write([]byte("response_type=error&status_code=400&message=Invalid request\n"))
+	conn.Close()
 }
 
 func read_message(conn net.Conn) (string, error) {
