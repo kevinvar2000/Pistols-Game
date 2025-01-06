@@ -1,3 +1,4 @@
+import ipaddress
 import tkinter as tk
 from client import Client
 from menu_win import MenuWindow
@@ -56,6 +57,24 @@ class ConnectWindow:
                 self.error_label.config(text="Please enter a valid server IP and port.")
                 self.error_label.pack(pady=10)
                 return
+
+            try:
+                ipaddress.ip_address(server_ip)
+            except ValueError:
+                print("Invalid IP address. Please enter a valid IP.")
+                self.error_label.config(text="Invalid IP address. Please enter a valid IP.")
+                self.error_label.pack(pady=10)
+                return
+
+            try:
+                server_port = int(server_port)
+                if server_port < 1 or server_port > 65535:
+                    raise ValueError("Port out of range")
+            except ValueError:
+                print("Invalid port number. Please enter a valid integer between 1 and 65535.")
+                self.error_label.config(text="Invalid port number. Please enter a valid integer between 1 and 65535.")
+                self.error_label.pack(pady=10)
+
 
             self.client.set_server_info(server_ip, int(server_port))
 

@@ -1,7 +1,10 @@
 package main
 
 import (
+	"fmt"
+	"net"
 	"os"
+	"strconv"
 )
 
 func main() {
@@ -15,7 +18,32 @@ func main() {
 func get_address() string {
 	args := os.Args
 	if len(args) >= 2 {
-		return args[1]
+		address := args[1]
+		if is_valid_address(address) {
+			return address
+		}
+		fmt.Println("Invalid address provided, falling back to default.")
 	}
 	return CONN_ADDRESS + ":" + CONN_PORT
+}
+
+func is_valid_address(address string) bool {
+
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return false
+	}
+
+	if net.ParseIP(host) == nil {
+		fmt.Println("Invalid IP address:", host)
+		return false
+	}
+
+	portInt, err := strconv.Atoi(port)
+	if err != nil || portInt < 1 || portInt > 65535 {
+		fmt.Println("Invalid port:", port)
+		return false
+	}
+
+	return true
 }
