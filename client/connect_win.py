@@ -74,7 +74,7 @@ class ConnectWindow:
                 print("Invalid port number. Please enter a valid integer between 1 and 65535.")
                 self.error_label.config(text="Invalid port number. Please enter a valid integer between 1 and 65535.")
                 self.error_label.pack(pady=10)
-
+                return
 
             self.client.set_server_info(server_ip, int(server_port))
 
@@ -84,10 +84,6 @@ class ConnectWindow:
                 print("Failed to connect to the server.")
                 self.error_label.config(text="Failed to connect to the server.")
                 self.error_label.pack(pady=10)
-        except ValueError:
-            print("Invalid port number. Please enter a valid integer.")
-            self.error_label.config(text="Invalid port number. Please enter a valid integer.")
-            self.error_label.pack(pady=10)
         except Exception as e:
             print(f"An error occurred: {e}")
             self.error_label.config(text=f"An error occurred: {e}")
