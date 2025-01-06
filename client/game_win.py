@@ -1,7 +1,7 @@
 import time
 import tkinter as tk
 from tkinter import messagebox
-from const import WIN_SIZE, BUTTON_FONT, LABEL_FONT, REQUEST_INTERVAL, ELEMENT_SIZE
+from const import WIN_SIZE, BUTTON_FONT, LABEL_FONT, REQUEST_INTERVAL, ELEMENT_SIZE, WIN_BG, BTN_BG, BTN_FG, LABEL_BG, LABEL_FG, ERROR_BG, ERROR_FG
 
 class GameWindow:
     def __init__(self, root, client, client_name):
@@ -13,6 +13,7 @@ class GameWindow:
         self.root.title("Game")
         self.root.geometry(WIN_SIZE)
         self.root.resizable(False, False)
+        self.root.configure(bg=WIN_BG)
 
         # Start the waiting room until game is ready
         self.waiting_room()
@@ -169,32 +170,31 @@ class GameWindow:
 
 
         # Client name display
-        self.name_label = tk.Label(self.root, text=f"Name: {self.client_name}", font=LABEL_FONT)
+        self.name_label = tk.Label(self.root, text=f"Name: {self.client_name}", font=LABEL_FONT, bg=LABEL_BG, fg=LABEL_FG)
         self.name_label.pack(pady=10)
 
         # Health and Ammo display
-        self.health_label = tk.Label(self.root, text="Health: Loading...", font=LABEL_FONT)
+        self.health_label = tk.Label(self.root, text="Health: Loading...", font=LABEL_FONT, bg=LABEL_BG, fg=LABEL_FG)
         self.health_label.pack(pady=10)
 
-        self.ammo_label = tk.Label(self.root, text="Ammo: Loading...", font=LABEL_FONT)
+        self.ammo_label = tk.Label(self.root, text="Ammo: Loading...", font=LABEL_FONT, bg=LABEL_BG, fg=LABEL_FG)
         self.ammo_label.pack(pady=10)
 
         # Opponent's Health display
-        self.opponent_health_label = tk.Label(self.root, text="Opponent Health: Loading...", font=LABEL_FONT)
+        self.opponent_health_label = tk.Label(self.root, text="Opponent Health: Loading...", font=LABEL_FONT, bg=LABEL_BG, fg=LABEL_FG)
         self.opponent_health_label.pack(pady=5)
     
         # Info and Error labels
-        self.info_label = tk.Label(self.root, text="Choose an action:", font=LABEL_FONT)
+        self.info_label = tk.Label(self.root, text="Choose an action:", font=LABEL_FONT, bg=LABEL_BG, fg=LABEL_FG)
         self.info_label.pack(pady=10)
 
-        self.error_label = tk.Label(self.root, text="", font=LABEL_FONT, fg="red")
-        self.error_label.pack(pady=10)
+        self.error_label = tk.Label(self.root, text="", font=LABEL_FONT, fg=ERROR_FG, bg=ERROR_BG, relief="solid")
 
 
         # Buttons for actions
-        tk.Button(self.root, text="Shoot", font=BUTTON_FONT, command=self.shoot, width=ELEMENT_SIZE).pack(pady=5)
-        tk.Button(self.root, text="Reload", font=BUTTON_FONT, command=self.reload, width=ELEMENT_SIZE).pack(pady=5)
-        tk.Button(self.root, text="Cover", font=BUTTON_FONT, command=self.cover, width=ELEMENT_SIZE).pack(pady=5)
+        tk.Button(self.root, text="Shoot", font=BUTTON_FONT, command=self.shoot, width=ELEMENT_SIZE, bg=BTN_BG, fg=BTN_FG).pack(pady=5)
+        tk.Button(self.root, text="Reload", font=BUTTON_FONT, command=self.reload, width=ELEMENT_SIZE, bg=BTN_BG, fg=BTN_FG).pack(pady=5)
+        tk.Button(self.root, text="Cover", font=BUTTON_FONT, command=self.cover, width=ELEMENT_SIZE, bg=BTN_BG, fg=BTN_FG).pack(pady=5)
 
         self.root.protocol("WM_DELETE_WINDOW", self.close_window)
 
@@ -421,6 +421,10 @@ class GameWindow:
         if error_message is not None:
             print(f"Updating error label: {error_message}")
             self.error_label.config(text=error_message)
+            if error_message != "":
+                self.error_label.pack(pady=10)
+            else:    
+                self.error_label.pack_forget()
         
         self.root.update()
         self.root.update_idletasks()

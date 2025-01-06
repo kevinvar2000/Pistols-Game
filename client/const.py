@@ -6,9 +6,17 @@ REQUEST_INTERVAL = 1000  # Time in milliseconds between requests
 
 # Window constants
 WIN_SIZE = "600x600"                                 # Default window size
+WIN_BG = "lightyellow"                               # Default window background color
+BTN_BG = "lightblue"                                 # Default button background color
+BTN_FG = "black"                                     # Default button foreground color
+INPUT_BG = "lightblue"                               # Default input field background color
+INPUT_FG = "black"                                   # Default input field foreground color
+LABEL_BG = "lightyellow"                             # Default label background color
+LABEL_FG = "black"                                   # Default label foreground color
+ERROR_BG = "red"                                     # Default error message background color
+ERROR_FG = "black"                                   # Default error message foreground color
 ELEMENT_SIZE = 20                                    # Default element size
 TITLE_FONT = ("Comic Sans MS", 20, "bold")           # Default font style
 BUTTON_FONT = ("Comic Sans MS", 14, "bold")          # Default font style
 LABEL_FONT = ("Comic Sans MS", 14, "bold")           # Default font style
-INPUT_FONT = ("Comic Sans MS", 14, "bold")           # Default font style
 ERROR_FONT = ("Comic Sans MS", 12, "bold")           # Default font style
