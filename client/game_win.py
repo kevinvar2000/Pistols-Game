@@ -347,6 +347,7 @@ class GameWindow:
                 elif result_message == "Draw":
                     print("Game ended in a draw.")
                     result_message = "Game ended in a draw."
+                    self.root.after(0, lambda: self.update_labels(opponent_health=0))
 
                 # Update the labels
                 self.root.after(0, lambda: self.update_labels(info_message=result_message))
@@ -367,9 +368,10 @@ class GameWindow:
 
 
     def ask_play_again(self, result_message):
-        result = messagebox.askquestion("Game Over", f"{result_message}\nDo you want to play again?", icon='question')
-
+        
         self.cancel_callbacks()
+
+        result = messagebox.askquestion("Game Over", f"{result_message}\nDo you want to play again?", icon='question')
 
         if result == 'yes':
             print("Player chose to play again. Returning to the waiting room...")
