@@ -4,7 +4,6 @@ from const import WIN_SIZE, TITLE_FONT, BUTTON_FONT, LABEL_FONT, ERROR_FONT, ELE
 
 class MenuWindow:
 
-
     def __init__(self, root, client):
         self.client = client
 
@@ -29,24 +28,27 @@ class MenuWindow:
         tk.Button(self.root, text="Play", font=BUTTON_FONT, command=self.play, width=ELEMENT_SIZE, bg=BTN_BG, fg=BTN_FG).pack(pady=10)
         tk.Button(self.root, text="Back", font=BUTTON_FONT, command=self.back , width=ELEMENT_SIZE, bg=BTN_BG, fg=BTN_FG).pack(pady=10)
 
-
     def play(self):
-
+        # Get the name entered by the user
         name = self.name_entry.get().strip()
         if not name or len(name) == 0:
+            # Show error if name is invalid
             print("Please enter a valid name.")
             self.error_label.config(text="Please enter a valid name.")
             self.error_label.pack(pady=10)
             return
         
+        # Send request to the server with the entered name
         response = self.client.send_request("request_type=name&name=" + name, "name")
 
         print(f"Response in play: {response}")
 
         if response.get("response_type") == "name":
             if response.get("status_code") == "200":
+                # Load the game window if the name is accepted
                 self.load_game_window(name)
             else:
+                # Show error if the name is not accepted
                 print(f"Failed to set name: {response.get('message')}")
                 self.error_label.config(text=response.get("message"))
                 self.error_label.pack(pady=10)
@@ -59,7 +61,6 @@ class MenuWindow:
         # Load the game window
         GameWindow(self.root, self.client, name)
 
-
     def back(self):
         # Clear the current window
         for widget in self.root.winfo_children():
@@ -67,9 +68,9 @@ class MenuWindow:
 
         from connect_win import ConnectWindow
 
-        # Load the connect
+        # Load the connect window
         ConnectWindow(self.root)
 
-
     def run(self):
+        # Run the Tkinter main loop
         self.root.mainloop()

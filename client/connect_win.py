@@ -7,25 +7,29 @@ from const import SERVER_IP, SERVER_PORT, WIN_SIZE, TITLE_FONT, BUTTON_FONT, ERR
 class ConnectWindow:
 
     def __init__(self, root=None):
+        # Initialize the client
         self.client = Client()
 
+        # Initialize the root window
         if root is None:
             self.root = tk.Tk()
         else:
             self.root = root
 
+        # Configure the root window
         self.root.title("Connect")
         self.root.geometry(WIN_SIZE)
         self.root.resizable(False, False)
         self.root.configure(bg=WIN_BG)
 
-        # Title
+        # Title label
         tk.Label(self.root, text="Connect to the Server", font=TITLE_FONT, bg=LABEL_BG, fg=LABEL_FG).pack(pady=50)
 
+        # Frame for input fields
         self.input_frame = tk.Frame(self.root, bg=WIN_BG)
         self.input_frame.pack(pady=10)
 
-        # Server input field
+        # Server IP input field
         tk.Label(self.input_frame, text="Server IP:", font=LABEL_FONT, bg=LABEL_BG, fg=LABEL_FG).pack(pady=5)
         self.server_ip_entry = tk.Entry(self.input_frame, font=LABEL_FONT, width=ELEMENT_SIZE, bg=INPUT_BG, fg=INPUT_FG, justify="center")
         self.server_ip_entry.pack(pady=5)
@@ -37,27 +41,32 @@ class ConnectWindow:
         self.server_port_entry.pack(pady=5)
         self.server_port_entry.insert(0, SERVER_PORT)
 
-        # Error feedback
+        # Error feedback label
         self.error_label = tk.Label(self.input_frame, text="", font=ERROR_FONT, fg=ERROR_FG, bg=ERROR_BG, relief="solid")
 
+        # Frame for buttons
         self.button_frame = tk.Frame(self.root, bg=WIN_BG)
         self.button_frame.pack(pady=10)
 
-        # Buttons
+        # Connect button
         tk.Button(self.button_frame, text="Connect", font=BUTTON_FONT, command=self.connect_and_start, width=ELEMENT_SIZE, bg=BTN_BG, fg=BTN_FG).pack(pady=10)
+        # Quit button
         tk.Button(self.button_frame, text="Quit", font=BUTTON_FONT, command=self.quit, width=ELEMENT_SIZE, bg=BTN_BG, fg=BTN_FG).pack(pady=10)
 
     def connect_and_start(self):
         try:
+            # Get server IP and port from input fields
             server_ip = self.server_ip_entry.get().strip()
             server_port = self.server_port_entry.get().strip()
 
+            # Validate input fields
             if not server_ip or not server_port:
                 print("Please enter a valid server IP and port.")
                 self.error_label.config(text="Please enter a valid server IP and port.")
                 self.error_label.pack(pady=10)
                 return
 
+            # Validate IP address
             try:
                 ipaddress.ip_address(server_ip)
             except ValueError:
@@ -66,6 +75,7 @@ class ConnectWindow:
                 self.error_label.pack(pady=10)
                 return
 
+            # Validate port number
             try:
                 server_port = int(server_port)
                 if server_port < 1 or server_port > 65535:
@@ -76,8 +86,10 @@ class ConnectWindow:
                 self.error_label.pack(pady=10)
                 return
 
+            # Set server info in the client
             self.client.set_server_info(server_ip, int(server_port))
 
+            # Attempt to connect to the server
             if self.client.connect():
                 self.load_menu_window()
             else:
@@ -97,11 +109,11 @@ class ConnectWindow:
         # Load the menu interface
         MenuWindow(self.root, self.client)
 
-
     def quit(self):
+        # Close the client and destroy the root window
         self.client.close()
         self.root.destroy()
 
-
     def run(self):
+        # Run the Tkinter main loop
         self.root.mainloop()

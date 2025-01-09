@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+// start_server initializes a server listener on the given address
 func start_server(address string) net.Listener {
 	listener, err := net.Listen(CONN_NETWORK, address)
 	if err != nil {
@@ -19,6 +20,7 @@ func start_server(address string) net.Listener {
 	return listener
 }
 
+// accept_connections continuously accepts incoming connections
 func accept_connections(listener net.Listener) {
 	for {
 		conn, err := listener.Accept()
@@ -28,10 +30,12 @@ func accept_connections(listener net.Listener) {
 		}
 		fmt.Println("Accepted connection from", conn.RemoteAddr().String())
 
+		// Handle each connection in a separate goroutine
 		go handle_connection(conn)
 	}
 }
 
+// handle_connection processes messages from a single connection
 func handle_connection(conn net.Conn) {
 	defer conn.Close()
 
@@ -58,7 +62,6 @@ func handle_connection(conn net.Conn) {
 
 		// Trim the message of any leading or trailing spaces
 		message = strings.TrimSpace(message)
-		// fmt.Println("Received message:", message)
 
 		// Check if the message is empty
 		if len(message) == 0 {
@@ -66,6 +69,7 @@ func handle_connection(conn net.Conn) {
 			continue
 		}
 
+		// Validate the message format
 		if !strings.HasPrefix(message, "request_type") {
 			invalid_message(conn)
 			return
@@ -74,13 +78,14 @@ func handle_connection(conn net.Conn) {
 		// Trim the message of the request_type prefix
 		request := strings.TrimPrefix(message, "request_type=")
 
+		// Handle ping requests
 		if strings.HasPrefix(request, "ping") {
 			ping(conn)
 			continue
 		}
 
+		// Handle registered player requests
 		if is_registered {
-
 			fmt.Printf("Player %s sent request: %s\n", player.name, request)
 
 			switch {
@@ -121,11 +126,10 @@ func handle_connection(conn net.Conn) {
 			}
 		}
 	}
-
 }
 
+// register_player registers a new player with the given request
 func register_player(conn net.Conn, request string) *Player {
-
 	player_name := strings.TrimPrefix(request, "name&name=")
 	fmt.Println("Registering player:", player_name)
 	conn.Write([]byte("response_type=name&status_code=200&message=Player registered\n"))
@@ -133,14 +137,15 @@ func register_player(conn net.Conn, request string) *Player {
 	return create_player(conn, player_name)
 }
 
+// invalid_message sends an error response for invalid messages
 func invalid_message(conn net.Conn) {
 	fmt.Println("Invalid message received.")
 	conn.Write([]byte("response_type=error&status_code=400&message=Invalid request\n"))
 	conn.Close()
 }
 
+// read_message reads a message from the connection
 func read_message(conn net.Conn) (string, error) {
-
 	buffer := make([]byte, 1024)
 	n, err := conn.Read(buffer)
 	if err != nil {
@@ -150,8 +155,8 @@ func read_message(conn net.Conn) (string, error) {
 	return string(buffer[:n]), nil
 }
 
+// ping sends a pong response to the client
 func ping(conn net.Conn) {
-
 	fmt.Println("Pinging player...")
 	conn.Write([]byte("response_type=ping&status_code=200&message=Pong\n"))
 }
