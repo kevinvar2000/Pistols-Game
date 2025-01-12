@@ -22,7 +22,7 @@ class MenuWindow:
         self.name_entry.pack(pady=5)
 
         # Error feedback
-        self.error_label = tk.Label(self.root, text="", font=ERROR_FONT, fg=ERROR_FG, bg=ERROR_BG, relief="solid")
+        self.error_label = tk.Label(self.root, text="", font=ERROR_FONT, fg=ERROR_FG, bg=ERROR_BG, relief="solid", wraplength=400, justify="center")
 
         # Buttons
         tk.Button(self.root, text="Play", font=BUTTON_FONT, command=self.play, width=ELEMENT_SIZE, bg=BTN_BG, fg=BTN_FG).pack(pady=10)
@@ -52,6 +52,11 @@ class MenuWindow:
                 print(f"Failed to set name: {response.get('message')}")
                 self.error_label.config(text=response.get("message"))
                 self.error_label.pack(pady=10)
+        else:
+            # Show error
+            print(f"Error: {response.get('message')}")
+            self.error_label.config(text="Error: " + response.get("message"))
+            self.error_label.pack(pady=10)
 
     def load_game_window(self, name):
         # Clear the current window

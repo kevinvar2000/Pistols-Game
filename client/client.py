@@ -1,7 +1,7 @@
 import time
 import socket
 import threading
-from const import BUFFER_SIZE, PING_INTERVAL, REQUEST_INTERVAL
+from const import BUFFER_SIZE, PING_INTERVAL, REQUEST_INTERVAL, MAX_RETRIES
 
 class Client:
 
@@ -35,7 +35,6 @@ class Client:
         self.server_port = port
 
     def send_request(self, request, request_type):
-        MAX_RETRIES = 10  # Maximum attempts to get the expected response
         retries = 0
 
         with self.lock:
@@ -58,7 +57,7 @@ class Client:
                         continue
 
                     response = self.parse_response(response_data)
-                    print(f"Parsed response: {response}")
+                    # print(f"Parsed response: {response}")
 
                     if response.get("response_type") == request_type:
                         return response
@@ -74,12 +73,10 @@ class Client:
                         print(f"Ignored unrelated response: {response}", file=log_file)
                         log_file.write(f"{response}\n")
 
-                    print("After writing to log file")
-
                 # If maximum retries are exceeded
                 raise TimeoutError("Did not receive the expected response in time.")
             except Exception as e:
-                print(f"Error sending request: {e}")
+                (f"Error sending request: {e}")
                 # self.connect()
                 return {"status": "error", "message": str(e)}
 

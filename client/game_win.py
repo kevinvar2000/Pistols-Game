@@ -1,7 +1,7 @@
 import time
 import tkinter as tk
 from tkinter import messagebox
-from const import WIN_SIZE, BUTTON_FONT, LABEL_FONT, REQUEST_INTERVAL, ELEMENT_SIZE, WIN_BG, BTN_BG, BTN_FG, LABEL_BG, LABEL_FG, ERROR_BG, ERROR_FG
+from const import WIN_SIZE, BUTTON_FONT, LABEL_FONT, REQUEST_INTERVAL, ELEMENT_SIZE, WIN_BG, BTN_BG, BTN_FG, LABEL_BG, LABEL_FG, ERROR_BG, ERROR_FG, INACTIVE_TIMEOUT
 
 class GameWindow:
     def __init__(self, root, client, client_name):
@@ -126,16 +126,6 @@ class GameWindow:
                     print("Round is still running. Checking again shortly...")
                     self.timeout_handled = False
                     self.root.after(REQUEST_INTERVAL, self.check_round_state)
-                elif state_message == "Timeout":
-                    print("Round timed out.")
-                    if not self.timeout:
-                        print("Sending a reload action...")
-                        self.timeout = True
-                        self.update_labels(error_message="Round timed out. Sending a reload action...")
-                        self.reload()
-                    else:
-                        print("Timeout already handled. Waiting for the next update.")
-                        self.root.after(REQUEST_INTERVAL, self.check_round_state)
                 elif state_message == "End":
                     print("Round ended. Processing results...")
                     self.timeout_handled = False
@@ -199,9 +189,9 @@ class GameWindow:
     def check_inactivity(self):
         current_time = time.time()
 
-        if current_time - self.last_action_time > 20:
-            print("Player has been inactive for 20 seconds. Sending a reload action...")
-            self.update_labels(error_message="You have been inactive for 20 seconds. Sending a reload action...")
+        if current_time - self.last_action_time > INACTIVE_TIMEOUT:
+            print(f"Player has been inactive for {INACTIVE_TIMEOUT} seconds. Sending a reload action...")
+            self.update_labels(error_message=f"You have been inactive for {INACTIVE_TIMEOUT} seconds. Sending a reload action...")
             self.reload()
             self.root.after(REQUEST_INTERVAL, lambda: self.update_labels(error_message=""))
 

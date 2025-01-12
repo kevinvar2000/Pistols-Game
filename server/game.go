@@ -132,8 +132,6 @@ func (game *Game) game_loop() {
 func (game *Game) wait_for_all_actions() bool {
 	fmt.Println("Waiting for player actions...")
 
-	timeout := time.After(time.Duration(ACTION_TIMEOUT) * time.Second)
-
 	game.mutex.Lock()
 	game.round_state = "running"
 	game.mutex.Unlock()
@@ -158,18 +156,6 @@ func (game *Game) wait_for_all_actions() bool {
 			return true
 		}
 
-		select {
-		case <-timeout:
-			fmt.Println("Timeout reached while waiting for player actions.")
-			// Send a response to the players
-			game.mutex.Lock()
-			game.round_state = "timeout"
-			game.mutex.Unlock()
-			return false
-		default:
-			fmt.Println("Sleeping for 5 seconds...")
-			time.Sleep(time.Duration(5) * time.Second)
-		}
 	}
 }
 
@@ -372,7 +358,6 @@ func get_game_result(player *Player) {
 	player.mutex.Unlock()
 
 	game.mutex.Lock()
-	fmt.Println("Got lock on game.mutex...")
 	game_state = game.game_state
 	if strings.HasPrefix(game_state, "over:winner") {
 		winner_name = strings.TrimPrefix(game_state, "over:winner:")
@@ -421,9 +406,6 @@ func get_round_state(player *Player) {
 	if player.game.round_state == "running" {
 		fmt.Println("Round is running.")
 		player.conn.Write([]byte("response_type=round_state&status_code=200&message=Running\n"))
-	} else if player.game.round_state == "timeout" {
-		fmt.Println("Round timed out.")
-		player.conn.Write([]byte("response_type=round_state&status_code=200&message=Timeout\n"))
 	} else {
 		fmt.Println("Round ended.")
 		player.conn.Write([]byte("response_type=round_state&status_code=200&message=End\n"))
