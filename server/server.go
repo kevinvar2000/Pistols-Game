@@ -107,6 +107,8 @@ func handle_connection(conn net.Conn) {
 				get_game_result(player)
 			case strings.HasPrefix(request, "round_state"):
 				get_round_state(player)
+			case strings.HasPrefix(request, "game_state"):
+				get_game_state(player)
 			default:
 				invalid_message(conn)
 				return
@@ -130,11 +132,40 @@ func handle_connection(conn net.Conn) {
 
 // register_player registers a new player with the given request
 func register_player(conn net.Conn, request string) *Player {
+
 	player_name := strings.TrimPrefix(request, "name&name=")
 	fmt.Println("Registering player:", player_name)
-	conn.Write([]byte("response_type=name&status_code=200&message=Player registered\n"))
 
-	return create_player(conn, player_name)
+	var new_player *Player
+
+	if player, exists := disconnected_players[player_name]; exists {
+		fmt.Println("Player reconnected:", player_name)
+
+		// Reconnect the player
+		new_player = player
+		new_player.conn = conn
+
+		// Update the game's state if necessary
+		player.game.mutex.Lock()
+		player.game.players[player] = true // Ensure the player is re-added to the game's player list
+		player.game.mutex.Unlock()
+
+		// Remove the player from the disconnected players list
+		delete(disconnected_players, player_name)
+
+		// Send a response to the player
+		conn.Write([]byte("response_type=name&status_code=200&message=Player reconnected\n"))
+
+	} else {
+		fmt.Println("New player registered:", player_name)
+
+		new_player = create_player(conn, player_name)
+
+		// Send a response to the player
+		conn.Write([]byte("response_type=name&status_code=200&message=Player registered\n"))
+	}
+
+	return new_player
 }
 
 // invalid_message sends an error response for invalid messages

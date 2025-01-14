@@ -1,13 +1,14 @@
 import time
 import tkinter as tk
 from tkinter import messagebox
-from const import WIN_SIZE, BUTTON_FONT, LABEL_FONT, REQUEST_INTERVAL, ELEMENT_SIZE, WIN_BG, BTN_BG, BTN_FG, LABEL_BG, LABEL_FG, ERROR_BG, ERROR_FG, INACTIVE_TIMEOUT
+from const import WIN_SIZE, BUTTON_FONT, LABEL_FONT, REQUEST_INTERVAL, ELEMENT_SIZE, WIN_BG, BTN_BG, BTN_FG, LABEL_BG, LABEL_FG, ERROR_BG, ERROR_FG, INACTIVE_TIMEOUT, CHECK_INTERVAL
 
 class GameWindow:
     def __init__(self, root, client, client_name):
         self.client = client
         self.client_name = client_name
-        self.timeout = False
+        self.check_activity = True
+        self.check_result = False
 
         self.root = root
         self.root.title("Game")
@@ -52,11 +53,14 @@ class GameWindow:
     def cover(self):
         self.send_action("request_type=action&action_type=cover")
 
-    def disable_actions(self):
+    def disable_actions(self, reconnect=False):
         print("*** Disabling actions ***")
 
         # Update the info label
-        self.info_label.config(text="Waiting for response...")
+        if reconnect:
+            self.info_label.config(text="Reconnecting... Please wait.")
+        else:
+            self.info_label.config(text="Waiting for response...")
 
         # Disable all widgets
         for widget in self.root.winfo_children():
@@ -105,10 +109,10 @@ class GameWindow:
                 self.load_game()
             else:
                 print(f"Game not ready: {response.get('message')}")
-                self.root.after(2000, self.check_game_ready)
+                self.root.after(REQUEST_INTERVAL, self.check_game_ready)
         else:
             print(f"Ignoring unrelated response: {response}")
-            self.root.after(2000, self.check_game_ready)
+            self.root.after(REQUEST_INTERVAL, self.check_game_ready)
 
     def check_round_state(self):
         print("*** Checking round state ***")
@@ -124,11 +128,9 @@ class GameWindow:
 
                 if state_message == "Running":
                     print("Round is still running. Checking again shortly...")
-                    self.timeout_handled = False
                     self.root.after(REQUEST_INTERVAL, self.check_round_state)
                 elif state_message == "End":
                     print("Round ended. Processing results...")
-                    self.timeout_handled = False
                     self.get_player_state()
                     self.enable_actions()
             else:
@@ -177,6 +179,10 @@ class GameWindow:
 
         print("Starting the game...")
 
+        # Set flags
+        self.check_activity = True
+        self.check_result = False
+
         # Start fetching the player state asynchronously
         self.root.after(0, self.get_player_state)
 
@@ -184,9 +190,16 @@ class GameWindow:
         self.last_action_time = time.time()
 
         # Check for inactivity every 5 seconds
-        self.root.after(5000, self.check_inactivity)
+        self.root.after(CHECK_INTERVAL, self.check_inactivity)
+
+        # Check the game state
+        self.root.after(CHECK_INTERVAL, self.check_game_state)
 
     def check_inactivity(self):
+
+        if not self.check_activity:
+            return
+
         current_time = time.time()
 
         if current_time - self.last_action_time > INACTIVE_TIMEOUT:
@@ -195,7 +208,7 @@ class GameWindow:
             self.reload()
             self.root.after(REQUEST_INTERVAL, lambda: self.update_labels(error_message=""))
 
-        self.root.after(5000, self.check_inactivity)
+        self.root.after(CHECK_INTERVAL, self.check_inactivity)
 
     def get_player_state(self):
         print("*** Getting player state ***")
@@ -299,6 +312,8 @@ class GameWindow:
                 result_message = response.get("message").strip()
                 print(f"Game result: {result_message}")
 
+                self.check_result = True
+
                 if result_message == "Win":
                     print("You win! Congratulations!")
                     result_message = "You win! Congratulations!"
@@ -315,19 +330,75 @@ class GameWindow:
                 self.root.after(0, lambda: self.update_labels(info_message=result_message))
 
                 # Ask player to play again or quit
-                self.root.after(2000, lambda: self.ask_play_again(result_message))
+                self.root.after(REQUEST_INTERVAL, lambda: self.ask_play_again(result_message))
             elif response.get("status_code") == "400":
                 print("Game is still running... Fetching opponent state.")
                 self.get_opponent_state()
             else:
                 print(f"Failed to get game result: {response.get('message')}")
                 self.update_labels(error_message=response.get("message"))
-                self.root.after(2000, self.check_game_result)
+                self.root.after(REQUEST_INTERVAL, self.check_game_result)
         else:
             print(f"Ignoring unrelated response: {response}")
-            self.root.after(2000, self.check_game_result)
+            self.root.after(REQUEST_INTERVAL, self.check_game_result)
+
+
+    def check_game_state(self):
+        print("*** Checking game state ***")
+
+        after_reconnect = False
+
+        # Send a request to check the game state
+        response = self.client.send_request("request_type=game_state", "game_state")
+        print(f"Response in check_game_state: {response}")
+
+        if response.get("response_type") == "game_state":
+            if response.get("status_code") == "200":
+                state_message = response.get("message").strip()
+                print(f"Game state: {state_message}")
+
+                if state_message == "Exit":
+                    print("Game has ended due to opponent exit.")
+                    self.update_labels(info_message="Opponent has left the game. You win!")
+                    self.root.after(REQUEST_INTERVAL, lambda: self.ask_play_again("Opponent has left the game. You win!"))
+                elif state_message == "Reconnect":
+                    print("Game is reconnecting. Waiting for opponent...")
+                    
+                    # Disable actions while reconnecting
+                    self.check_activity = False
+                    self.disable_actions(reconnect=True)
+                    after_reconnect = True
+
+                    self.root.after(REQUEST_INTERVAL, self.check_game_state)
+                elif state_message == "Running":
+                    print("Game is still running. Checking again shortly...")
+
+                    # After reconnecting, enable actions
+                    if not after_reconnect:
+                        self.check_activity = True
+                        self.enable_actions()
+
+                    self.root.after(CHECK_INTERVAL, self.check_game_state)
+
+                elif state_message == "Over":
+
+                    if self.check_result:
+                        print("Game is over. Checking results...")
+                        self.check_game_result()
+
+            else:
+                print(f"Failed to get game state: {response.get('message')}")
+                self.update_labels(error_message=response.get("message"))
+                self.root.after(CHECK_INTERVAL, self.check_game_state)
+        else:
+            print(f"Ignoring unrelated response: {response}")
+            self.root.after(CHECK_INTERVAL, self.check_game_state)
+
 
     def ask_play_again(self, result_message):
+
+        self.check_activity = False
+
         # Cancel all pending callbacks
         self.cancel_callbacks()
 
@@ -343,9 +414,6 @@ class GameWindow:
 
     def reset_game(self):
         print("*** Resetting game ***")
-
-        self.timeout = False
-        self.timeout_handled = False
 
         # Send a request to reset the game
         response = self.client.send_request("request_type=reset_game", "reset_game")
@@ -398,6 +466,7 @@ class GameWindow:
             self.root.after_cancel(self.check_game_result)
             self.root.after_cancel(self.check_round_state)
             self.root.after_cancel(self.check_inactivity)
+            self.root.after_cancel(self.check_game_state)
         except Exception as e:
             print(f"Error cancelling callbacks: {e}")
         else:

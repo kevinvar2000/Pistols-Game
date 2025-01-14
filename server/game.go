@@ -9,15 +9,45 @@ import (
 )
 
 var waiting_players = make(chan *Player, MAX_PLAYERS)
+var disconnected_players = make(map[string]*Player)
 
 // Function to wait for players to join the game
 func wait_for_players(player *Player) {
 	fmt.Println("Waiting for players to join...")
 
+	var game *Game
+
+	// Check if the player is reconnecting
+	if player.game != nil {
+
+		fmt.Println("Players game is not nil...")
+
+		player.game.mutex.Lock()
+		if player.game.game_state == "reconnect" {
+
+			fmt.Println("Player", player.name, "is reconnecting...")
+			game = player.game
+			player.game.game_state = "running"
+			player.game.mutex.Unlock()
+
+			fmt.Println("Reconnecting player to the game...")
+			game.start_game()
+			return
+		} else {
+			fmt.Println("Player's game state is not reconnect.")
+		}
+
+		player.game.mutex.Unlock()
+	} else {
+		fmt.Println("Player's game is nil.")
+	}
+
+	fmt.Println("Adding player to the waiting list...")
+
+	// Add player to the waiting list
 	waiting_players <- player
 
 	if len(waiting_players) == MAX_PLAYERS {
-		var game *Game
 
 		// Check if the player's existing game is reusable
 		if player.game != nil {
@@ -56,6 +86,9 @@ func game_ready(player *Player) {
 		} else if player.game.game_state == "waiting" {
 			fmt.Println("Game is in waiting state.")
 			player.conn.Write([]byte("response_type=game_ready&status_code=400&message=Game waiting\n"))
+		} else if player.game.game_state == "reconnect" {
+			fmt.Println("Game is waiting for player to reconnect.")
+			player.conn.Write([]byte("response_type=game_ready&status_code=400&message=Game reconnect\n"))
 		} else {
 			fmt.Println("Game is over.")
 			player.conn.Write([]byte("response_type=game_ready&status_code=400&message=Game over\n"))
@@ -107,7 +140,7 @@ func (game *Game) game_loop() {
 	for {
 		// Check if the game is running
 		if game.game_state != "running" {
-			fmt.Println("Game state is not running...")
+			fmt.Println("Game loop is not running...")
 			break
 		}
 
@@ -122,7 +155,7 @@ func (game *Game) game_loop() {
 			game.check_player_health()
 		}
 
-		time.Sleep(time.Duration(ROUND_PAUSE_TIME) * time.Second)
+		time.Sleep(time.Duration(ROUND_WAIT_TIME) * time.Second)
 	}
 
 	fmt.Println("Game loop ended...")
@@ -138,7 +171,17 @@ func (game *Game) wait_for_all_actions() bool {
 
 	for {
 		all_ready := true
+
 		game.mutex.Lock()
+
+		// Check if the game is running
+		if game.game_state != "running" {
+			fmt.Println("Game state is not running in wait for all actions.")
+			game.mutex.Unlock()
+			return false
+		}
+
+		// Check if all players have performed actions
 		for player := range game.players {
 			player.mutex.Lock()
 			if player.player_state.action == "" {
@@ -155,6 +198,8 @@ func (game *Game) wait_for_all_actions() bool {
 			game.mutex.Unlock()
 			return true
 		}
+
+		time.Sleep(time.Duration(ROUND_WAIT_TIME) * time.Second)
 
 	}
 }
@@ -396,6 +441,37 @@ func get_game_result(player *Player) {
 	game.mutex.Unlock()
 }
 
+// Function to get the game state
+func get_game_state(player *Player) {
+	fmt.Println("Getting game state...")
+
+	player.mutex.Lock()
+	game := player.game
+	player.mutex.Unlock()
+
+	game.mutex.Lock()
+	game_state := game.game_state
+	game.mutex.Unlock()
+
+	if game_state == "running" {
+		fmt.Println("Game is running.")
+		player.conn.Write([]byte("response_type=game_state&status_code=200&message=Running\n"))
+	} else if game_state == "reconnect" {
+		fmt.Println("Game is waiting for player to reconnect.")
+		player.conn.Write([]byte("response_type=game_state&status_code=200&message=Reconnect\n"))
+	} else if game_state == "waiting" {
+		fmt.Println("Game is waiting.")
+		player.conn.Write([]byte("response_type=game_state&status_code=200&message=Waiting\n"))
+	} else if game_state == "over:exit" {
+		fmt.Println("Game is over due to player exit.")
+		player.conn.Write([]byte("response_type=game_state&status_code=200&message=Exit\n"))
+	} else {
+		fmt.Println("Game is over.")
+		player.conn.Write([]byte("response_type=game_state&status_code=200&message=Over\n"))
+	}
+
+}
+
 // Function to get the round state
 func get_round_state(player *Player) {
 	fmt.Println("Getting round state...")
@@ -455,22 +531,56 @@ func close_game(player *Player) {
 
 	// Check if the player is registered
 	if player.game != nil {
+
+		fmt.Println("Saving player state and removing from the game...")
+
+		// Add player to the disconnected players list
+		disconnected_players[player.name] = player
+
 		// Remove player from the game
 		player.game.mutex.Lock()
 		delete(player.game.players, player)
-		player.game.mutex.Unlock()
+
+		fmt.Println("Player removed from the game.")
 
 		// Check if the game has any players left
 		if len(player.game.players) == 0 {
+			fmt.Println("No players left in the game. Cleaning up game state.")
 			player.game.game_state = "waiting" // Reset game state for reuse
-		}
+			clear(disconnected_players)
+		} else {
+			fmt.Println("Game waiting for player to reconnect.")
+			player.game.game_state = "reconnect"
 
-		player.game = nil
+			// Start the reconnect timer for this game
+			go start_reconnect_timer(player.game)
+		}
+		player.game.mutex.Unlock()
 	}
 
 	// Send a confirmation response to the player
+	fmt.Println("Closing the game for player:", player.name)
 	player.conn.Write([]byte("response_type=close_game&status_code=200&message=Goodbye\n"))
 
 	// Close the connection
+	fmt.Println("Closing the connection for player:", player.name)
 	player.conn.Close()
+}
+
+// Function to start the reconnect timer
+func start_reconnect_timer(game *Game) {
+	fmt.Println("Starting reconnect timer...")
+
+	time.Sleep(time.Duration(RECONNECT_TIMEOUT) * time.Second)
+
+	game.mutex.Lock()
+	if game.game_state == "reconnect" {
+		fmt.Println("Reconnect timer expired. Closing the game...")
+
+		game.game_state = "over:exit"
+
+		// Clear disconnected players list
+		clear(disconnected_players)
+	}
+	game.mutex.Unlock()
 }
