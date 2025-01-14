@@ -5,6 +5,7 @@ PING_INTERVAL = 3        # Time in seconds between pings
 REQUEST_INTERVAL = 1000  # Time in milliseconds between requests
 MAX_RETRIES = 10         # Maximum attempts to get the expected response
 INACTIVE_TIMEOUT = 20    # Time in seconds to wait for a response before timing out
+CHECK_INTERVAL = 5000    # Time in milliseconds between checking for a response
 
 # Window constants
 WIN_SIZE = "600x600"                                 # Default window size
