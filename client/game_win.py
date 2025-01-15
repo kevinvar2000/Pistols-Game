@@ -9,6 +9,8 @@ class GameWindow:
         self.client_name = client_name
         self.check_activity = True
         self.check_result = False
+        self.cancel_call = False
+        self.after_reconnect = False
 
         self.root = root
         self.root.title("Game")
@@ -132,7 +134,7 @@ class GameWindow:
                 elif state_message == "End":
                     print("Round ended. Processing results...")
                     self.get_player_state()
-                    self.enable_actions()
+                    self.root.after(2000, self.enable_actions)
             else:
                 print(f"Failed to get round state: {response.get('message')}")
                 self.update_labels(error_message=response.get("message"))
@@ -182,6 +184,7 @@ class GameWindow:
         # Set flags
         self.check_activity = True
         self.check_result = False
+        self.cancel_call = False
 
         # Start fetching the player state asynchronously
         self.root.after(0, self.get_player_state)
@@ -344,9 +347,12 @@ class GameWindow:
 
 
     def check_game_state(self):
+
+        if self.cancel_call:
+            return
+
         print("*** Checking game state ***")
 
-        after_reconnect = False
 
         # Send a request to check the game state
         response = self.client.send_request("request_type=game_state", "game_state")
@@ -366,16 +372,18 @@ class GameWindow:
                     
                     # Disable actions while reconnecting
                     self.check_activity = False
+                    self.after_reconnect = True
                     self.disable_actions(reconnect=True)
-                    after_reconnect = True
 
                     self.root.after(CHECK_INTERVAL, self.check_game_state)
                 elif state_message == "Running":
                     print("Game is still running. Checking again shortly...")
 
                     # After reconnecting, enable actions
-                    if after_reconnect:
+                    if self.after_reconnect:
+                        print("Game is running after reconnect.")
                         self.check_activity = True
+                        self.after_reconnect = False
                         self.enable_actions()
 
                     self.root.after(CHECK_INTERVAL, self.check_game_state)
@@ -398,6 +406,7 @@ class GameWindow:
     def ask_play_again(self, result_message):
 
         self.check_activity = False
+        self.cancel_call = True
 
         # Cancel all pending callbacks
         self.cancel_callbacks()
