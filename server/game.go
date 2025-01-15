@@ -72,6 +72,11 @@ func wait_for_players(player *Player) {
 			fmt.Println("Player joined the game:", player.name)
 		}
 
+		// drain waiting players
+		for len(waiting_players) > 0 {
+			<-waiting_players
+		}
+
 		// Start the game
 		game.start_game()
 	}
@@ -173,6 +178,16 @@ func (game *Game) wait_for_all_actions() bool {
 		all_ready := true
 
 		game.mutex.Lock()
+
+		// Handle "reconnect" state
+		if game.game_state == "reconnect" {
+			fmt.Println("Game state is reconnect in wait for all actions.")
+			game.mutex.Unlock()
+
+			// Wait for reconnect resolution before proceeding
+			time.Sleep(1 * time.Second)
+			continue
+		}
 
 		// Check if the game is running
 		if game.game_state != "running" {
@@ -498,16 +513,18 @@ func reset_game(player *Player) {
 	// Check if the player is registered
 	if player.game != nil {
 		// Remove player from the game
-		player.game.mutex.Lock()
-		delete(player.game.players, player)
-		player.game.mutex.Unlock()
+		// player.game.mutex.Lock()
+		// delete(player.game.players, player)
+		// player.game.mutex.Unlock()
 
-		// Check if the game has any players left
-		if len(player.game.players) == 0 {
-			player.game.game_state = "waiting" // Reset game state for reuse
-		}
+		// // Check if the game has any players left
+		// if len(player.game.players) == 0 {
+		// 	player.game.game_state = "waiting" // Reset game state for reuse
+		// }
+		fmt.Println("Resetting the game state.")
+		player.game.game_state = "waiting" // Reset game state for reuse
 
-		player.game = nil
+		// player.game = nil
 	}
 
 	// Reset player state
