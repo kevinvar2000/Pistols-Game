@@ -1,5 +1,5 @@
 SERVER_IP = '127.0.0.1'  # Change to your server's IP
-SERVER_PORT = 8080       # Port the server is listening on
+SERVER_PORT = 10000       # Port the server is listening on
 BUFFER_SIZE = 1024       # Max size of data from the server
 PING_INTERVAL = 3        # Time in seconds between pings
 REQUEST_INTERVAL = 1000  # Time in milliseconds between requests

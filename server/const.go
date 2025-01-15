@@ -3,7 +3,7 @@ package main
 // Constants for the server connection
 const (
 	CONN_ADDRESS = "0.0.0.0" // Address to bind the server
-	CONN_PORT    = "8080"    // Port to bind the server
+	CONN_PORT    = "10000"   // Port to bind the server
 	CONN_NETWORK = "tcp"     // Network protocol to use
 )
 
