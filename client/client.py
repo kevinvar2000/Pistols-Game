@@ -77,7 +77,7 @@ class Client:
                 raise TimeoutError("Did not receive the expected response in time.")
             except Exception as e:
                 (f"Error sending request: {e}")
-                # self.connect()
+                self.connect()
                 return {"status": "error", "message": str(e)}
 
     def parse_response(self, response_data):
