@@ -360,7 +360,7 @@ class GameWindow:
                 if state_message == "Exit":
                     print("Game has ended due to opponent exit.")
                     self.update_labels(info_message="Opponent has left the game. You win!")
-                    self.root.after(REQUEST_INTERVAL, lambda: self.ask_play_again("Opponent has left the game. You win!"))
+                    self.root.after(CHECK_INTERVAL, lambda: self.ask_play_again("Opponent has left the game. You win!"))
                 elif state_message == "Reconnect":
                     print("Game is reconnecting. Waiting for opponent...")
                     
@@ -369,12 +369,12 @@ class GameWindow:
                     self.disable_actions(reconnect=True)
                     after_reconnect = True
 
-                    self.root.after(REQUEST_INTERVAL, self.check_game_state)
+                    self.root.after(CHECK_INTERVAL, self.check_game_state)
                 elif state_message == "Running":
                     print("Game is still running. Checking again shortly...")
 
                     # After reconnecting, enable actions
-                    if not after_reconnect:
+                    if after_reconnect:
                         self.check_activity = True
                         self.enable_actions()
 
