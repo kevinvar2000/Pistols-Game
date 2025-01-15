@@ -30,6 +30,9 @@ func accept_connections(listener net.Listener) {
 		}
 		fmt.Println("Accepted connection from", conn.RemoteAddr().String())
 
+		// Send a welcome message to the client
+		conn.Write([]byte("response_type=welcome&status_code=200&message=Welcome to the game server\n"))
+
 		// Handle each connection in a separate goroutine
 		go handle_connection(conn)
 	}
@@ -54,6 +57,7 @@ func handle_connection(conn net.Conn) {
 				fmt.Println("Client disconnected.")
 			} else if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				fmt.Println("Connection timed out.")
+				conn.Write([]byte("response_type=error&status_code=408&message=Connection timed out\n"))
 			} else {
 				fmt.Println("Error reading from client:", err.Error())
 			}
@@ -79,6 +83,7 @@ func handle_connection(conn net.Conn) {
 		// Validate the message format
 		if !strings.HasPrefix(message, "request_type") {
 			invalid_message(conn)
+			handle_disconnection(player)
 			return
 		}
 
@@ -109,7 +114,6 @@ func handle_connection(conn net.Conn) {
 				reset_game(player)
 			case strings.HasPrefix(request, "action"):
 				set_player_action(player, request)
-				conn.Write([]byte("response_type=action&status_code=200&message=Action set\n"))
 			case strings.HasPrefix(request, "game_result"):
 				get_game_result(player)
 			case strings.HasPrefix(request, "round_state"):
@@ -118,20 +122,25 @@ func handle_connection(conn net.Conn) {
 				get_game_state(player)
 			default:
 				invalid_message(conn)
+				handle_disconnection(player)
 				return
 			}
 		} else {
 			// If the player is not registered, allow only "name:" message for registration
 			if strings.HasPrefix(request, "name") {
 				player = register_player(conn, request)
+
+				// If the player is nil, return
+				if player == nil {
+					continue
+				}
+
 				is_registered = true
 
 				go wait_for_players(player)
 			} else {
-				if player != nil {
-					invalid_message(conn)
-					return
-				}
+				// invalid_message(conn)
+				conn.Write([]byte("response_type=error&status_code=400&message=Player not registered\n"))
 			}
 		}
 	}
@@ -140,7 +149,30 @@ func handle_connection(conn net.Conn) {
 // register_player registers a new player with the given request
 func register_player(conn net.Conn, request string) *Player {
 
+	// Check if the request is valid
+	if !strings.HasPrefix(request, "name&name=") {
+		fmt.Println("Invalid name request.")
+		conn.Write([]byte("response_type=error&status_code=400&message=Invalid name request\n"))
+		return nil
+	}
+
+	// Extract the player name from the request
 	player_name := strings.TrimPrefix(request, "name&name=")
+
+	// Check if the player name is empty
+	if len(player_name) == 0 || player_name == "" {
+		fmt.Println("Empty player name received.")
+		conn.Write([]byte("response_type=error&status_code=400&message=Empty player name\n"))
+		return nil
+	}
+
+	// Check if the player name is too long
+	if len(player_name) > MAX_PLAYER_NAME_LENGTH {
+		fmt.Println("Player name too long.")
+		conn.Write([]byte("response_type=error&status_code=400&message=Player name too long\n"))
+		return nil
+	}
+
 	fmt.Println("Registering player:", player_name)
 
 	var new_player *Player
@@ -175,11 +207,20 @@ func register_player(conn net.Conn, request string) *Player {
 	return new_player
 }
 
+// handle_disconnection of a player
+func handle_disconnection(player *Player) {
+
+	// Remove the player from the game
+	if player != nil {
+		fmt.Println("Calling close_game for player:", player.name)
+		close_game(player)
+	}
+}
+
 // invalid_message sends an error response for invalid messages
 func invalid_message(conn net.Conn) {
 	fmt.Println("Invalid message received.")
 	conn.Write([]byte("response_type=error&status_code=400&message=Invalid request\n"))
-	conn.Close()
 }
 
 // read_message reads a message from the connection
