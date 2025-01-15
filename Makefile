@@ -10,6 +10,7 @@ else
 endif
 
 GO_CMD = go run .
+GO_BUILD_CMD = go build -o bin/server .
 
 # Initialize the Go module (only if needed)
 init-go-mod:
@@ -21,11 +22,15 @@ init-go-mod:
 
 # Server target
 server: init-go-mod
+	@echo "Building the server binary..."
+	@cd server && $(GO_BUILD_CMD)
+	@echo "Binary built at bin/server."
+	@echo "Running the server..."
 	@if [ "$(filter-out server,$(MAKECMDGOALS))" != "" ]; then \
 		echo "Starting the server with arguments: $(filter-out server,$(MAKECMDGOALS))"; \
-		cd server && go run . $(filter-out server,$(MAKECMDGOALS)); \
+		cd server && ./bin/server $(filter-out server,$(MAKECMDGOALS)); \
 	else \
-		cd server && go run .; \
+		cd server && ./bin/server; \
 	fi
 
 # Client target
