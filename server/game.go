@@ -221,8 +221,16 @@ func (game *Game) wait_for_all_actions() bool {
 
 // Function to set the player's action
 func set_player_action(player *Player, message string) {
+
+	// Check if the message is valid
+	if !strings.HasPrefix(message, "action&action_type=") {
+		fmt.Println("Invalid action request.")
+		player.conn.Write([]byte("response_type=action&status_code=400&message=Invalid action request\n"))
+		return
+	}
+
 	// action&action_type=shoot
-	action := message[len("action&action_type="):]
+	action := strings.TrimPrefix(message, "action&action_type=")
 
 	fmt.Println("Setting player action:", action)
 
@@ -230,7 +238,39 @@ func set_player_action(player *Player, message string) {
 	player.mutex.Lock()
 	defer player.mutex.Unlock()
 
-	player.player_state.action = strings.ToUpper(action)
+	// Check if player is registered in a game
+	if player.game == nil {
+		fmt.Println("Player is not registered in any game.")
+		player.conn.Write([]byte("response_type=action&status_code=400&message=Player not in game\n"))
+		return
+	}
+
+	// Check if game is running
+	if player.game.game_state != "running" {
+		fmt.Println("Game is not running.")
+		player.conn.Write([]byte("response_type=action&status_code=400&message=Game not running\n"))
+		return
+	}
+
+	// Check if player is dead
+	if player.player_state.action != "" {
+		fmt.Println("Player action already set.")
+		player.conn.Write([]byte("response_type=action&status_code=400&message=Action already set\n"))
+		return
+	}
+
+	action = strings.ToUpper(action)
+
+	// Check if the action is valid
+	if action != ACTION_SHOOT && action != ACTION_COVER && action != ACTION_RELOAD {
+		fmt.Println("Invalid action:", action)
+		player.conn.Write([]byte("response_type=action&status_code=400&message=Invalid action\n"))
+		return
+	}
+
+	// Set the player action
+	player.player_state.action = action
+	player.conn.Write([]byte("response_type=action&status_code=200&message=Action set\n"))
 }
 
 // Method to check player actions
@@ -352,6 +392,18 @@ func get_player_state(player *Player) {
 	player.mutex.Lock()
 	defer player.mutex.Unlock()
 
+	if player.game == nil {
+		fmt.Println("Player is not registered in any game.")
+		player.conn.Write([]byte("response_type=player_state&status_code=400&message=Player not in game\n"))
+		return
+	}
+
+	if player.game.game_state != "running" {
+		fmt.Println("Game is not running.")
+		player.conn.Write([]byte("response_type=player_state&status_code=400&message=Game not running\n"))
+		return
+	}
+
 	if player.player_state.is_dead {
 		fmt.Printf("Player %s is dead.\n", player.name)
 		player.conn.Write([]byte("response_type=player_state&status_code=200&message=Dead\n"))
@@ -367,6 +419,18 @@ func get_opponent_state(player *Player) {
 
 	player.mutex.Lock()
 	defer player.mutex.Unlock()
+
+	if player.game == nil {
+		fmt.Println("Player is not registered in any game.")
+		player.conn.Write([]byte("response_type=opponent_state&status_code=400&message=Player not in game\n"))
+		return
+	}
+
+	if player.game.game_state != "running" {
+		fmt.Println("Game is not running.")
+		player.conn.Write([]byte("response_type=opponent_state&status_code=400&message=Game not running\n"))
+		return
+	}
 
 	for opponent := range player.game.players {
 		if opponent != player {
@@ -417,6 +481,12 @@ func get_game_result(player *Player) {
 	player_name = player.name
 	player.mutex.Unlock()
 
+	if game == nil {
+		fmt.Println("Player is not registered in any game.")
+		player.conn.Write([]byte("response_type=game_result&status_code=400&message=Player not in game\n"))
+		return
+	}
+
 	game.mutex.Lock()
 	game_state = game.game_state
 	if strings.HasPrefix(game_state, "over:winner") {
@@ -464,6 +534,12 @@ func get_game_state(player *Player) {
 	game := player.game
 	player.mutex.Unlock()
 
+	if game == nil {
+		fmt.Println("Player is not registered in any game.")
+		player.conn.Write([]byte("response_type=game_state&status_code=400&message=Player not in game\n"))
+		return
+	}
+
 	game.mutex.Lock()
 	game_state := game.game_state
 	game.mutex.Unlock()
@@ -494,6 +570,12 @@ func get_round_state(player *Player) {
 	player.mutex.Lock()
 	defer player.mutex.Unlock()
 
+	if player.game == nil {
+		fmt.Println("Player is not registered in any game.")
+		player.conn.Write([]byte("response_type=round_state&status_code=400&message=Player not in game\n"))
+		return
+	}
+
 	if player.game.round_state == "running" {
 		fmt.Println("Round is running.")
 		player.conn.Write([]byte("response_type=round_state&status_code=200&message=Running\n"))
@@ -510,22 +592,14 @@ func reset_game(player *Player) {
 	player.mutex.Lock()
 	defer player.mutex.Unlock()
 
-	// Check if the player is registered
-	if player.game != nil {
-		// Remove player from the game
-		// player.game.mutex.Lock()
-		// delete(player.game.players, player)
-		// player.game.mutex.Unlock()
-
-		// // Check if the game has any players left
-		// if len(player.game.players) == 0 {
-		// 	player.game.game_state = "waiting" // Reset game state for reuse
-		// }
-		fmt.Println("Resetting the game state.")
-		player.game.game_state = "waiting" // Reset game state for reuse
-
-		// player.game = nil
+	if player.game == nil {
+		fmt.Println("Player is not registered in any game.")
+		player.conn.Write([]byte("response_type=reset_game&status_code=400&message=Player not in game\n"))
+		return
 	}
+
+	fmt.Println("Resetting the game state.")
+	player.game.game_state = "waiting" // Reset game state for reuse
 
 	// Reset player state
 	player.player_state.health = DEFAULT_HEALTH
@@ -575,6 +649,9 @@ func close_game(player *Player) {
 		player.game.mutex.Unlock()
 	}
 
+	// Remove the player from the waiting list
+	remove_from_waiting_list(player)
+
 	// Send a confirmation response to the player
 	fmt.Println("Closing the game for player:", player.name)
 	player.conn.Write([]byte("response_type=close_game&status_code=200&message=Goodbye\n"))
@@ -582,6 +659,21 @@ func close_game(player *Player) {
 	// Close the connection
 	fmt.Println("Closing the connection for player:", player.name)
 	player.conn.Close()
+}
+
+// Function to remove the player from the waiting list
+func remove_from_waiting_list(player *Player) {
+	fmt.Println("Removing player from the waiting list...")
+
+	// Get the current length of the channel
+	channelLength := len(waiting_players)
+
+	for i := 0; i < channelLength; i++ {
+		waiting_player := <-waiting_players
+		if waiting_player != player {
+			waiting_players <- waiting_player
+		}
+	}
 }
 
 // Function to start the reconnect timer
