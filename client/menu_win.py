@@ -73,6 +73,10 @@ class MenuWindow:
         GameWindow(self.root, self.client, name)
 
     def back(self):
+
+        # Disconnect from the server
+        self.client.close()
+
         # Clear the current window
         for widget in self.root.winfo_children():
             widget.destroy()

@@ -487,12 +487,8 @@ class GameWindow:
         # Cancel all pending callbacks
         self.cancel_callbacks()
 
-        # Close the client connection
-        try:
-            self.client.close()
-        except Exception as e:
-            print(f"Error closing client: {e}")
-        else:
-            print("Client closed successfully.")
+        # Send a request to close the game
+        self.client.close_game()
 
+        # Destroy the root window
         self.root.destroy()

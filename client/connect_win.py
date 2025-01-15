@@ -110,8 +110,7 @@ class ConnectWindow:
         MenuWindow(self.root, self.client)
 
     def quit(self):
-        # Close the client and destroy the root window
-        self.client.close()
+        # Destroy the root window
         self.root.destroy()
 
     def run(self):

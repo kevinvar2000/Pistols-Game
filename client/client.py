@@ -103,7 +103,7 @@ class Client:
                 break
             time.sleep(PING_INTERVAL)
 
-    def close(self):
+    def close_game(self):
         # Send a request to close the connection with the server
         response = self.send_request("request_type=close_game", "close_game")
         print(f"Close response: {response}")
@@ -115,3 +115,12 @@ class Client:
                 print("Failed to close the connection.")
         else:
             print("Unexpected response while closing the connection.")
+
+    def close(self):
+        # Close the socket connection
+        if self.socket:
+            self.socket.close()
+            self.socket = None
+            print("Connection closed.")
+        else:
+            print("No connection to close.")
