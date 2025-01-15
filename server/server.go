@@ -57,6 +57,13 @@ func handle_connection(conn net.Conn) {
 			} else {
 				fmt.Println("Error reading from client:", err.Error())
 			}
+
+			// If the player was registered, handle disconnection
+			if is_registered && player != nil {
+				fmt.Println("Calling close_game for player:", player.name)
+				close_game(player)
+			}
+
 			break
 		}
 
