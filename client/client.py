@@ -19,6 +19,10 @@ class Client:
             self.socket.connect((self.server_ip, self.server_port))
             print(f"Connected to server at {self.server_ip}:{self.server_port}")
 
+            # Send a hello message to the server
+            if not self.send_hello():
+                return False
+
             # Start a new thread to send periodic ping requests to the server
             threading.Thread(target=self.ping, daemon=True).start()
 
@@ -33,6 +37,27 @@ class Client:
         # Set the server IP and port
         self.server_ip = ip
         self.server_port = port
+
+
+    def send_hello(self):
+        # Send a hello message to the server
+        response = self.send_request("request_type=hello", "hello")
+        print(f"Hello response: {response}")
+
+        if response.get("response_type") == "hello":
+            if response.get("status_code") == "200":
+                print("Server accepted the connection.")
+                print(f"Server message: {response.get('message')}")
+                return True
+            else:
+                print("Server rejected the connection.")
+                self.close()
+                return False
+        else:
+            print("Unexpected response while connecting to the server.")
+            self.close()
+            return False
+
 
     def send_request(self, request, request_type):
         retries = 0
@@ -100,6 +125,7 @@ class Client:
                 print(f"Ping response: {response}")
             except Exception as e:
                 print(f"Ping failed: {e}")
+                self.connect()
                 break
             time.sleep(PING_INTERVAL)
 

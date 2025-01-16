@@ -30,9 +30,6 @@ func accept_connections(listener net.Listener) {
 		}
 		fmt.Println("Accepted connection from", conn.RemoteAddr().String())
 
-		// Send a welcome message to the client
-		conn.Write([]byte("response_type=welcome&status_code=200&message=Welcome to the game server\n"))
-
 		// Handle each connection in a separate goroutine
 		go handle_connection(conn)
 	}
@@ -42,6 +39,7 @@ func accept_connections(listener net.Listener) {
 func handle_connection(conn net.Conn) {
 	defer conn.Close()
 
+	hello_message := false
 	is_registered := false
 	var player *Player
 
@@ -94,6 +92,25 @@ func handle_connection(conn net.Conn) {
 		if strings.HasPrefix(request, "ping") {
 			ping(conn)
 			continue
+		}
+
+		// Check if the first message is a hello message
+		if !hello_message {
+
+			fmt.Println("First message:", request)
+
+			// Check if the first message is a hello message
+			if !strings.HasPrefix(request, "hello") {
+				fmt.Println("Invalid first message.")
+				conn.Write([]byte("response_type=hello&status_code=400&message=Invalid first message\n"))
+				handle_disconnection(player)
+				return
+			} else {
+				fmt.Println("Hello message received.")
+				conn.Write([]byte("response_type=hello&status_code=200&message=Hello\n"))
+				hello_message = true
+				continue
+			}
 		}
 
 		// Handle registered player requests
