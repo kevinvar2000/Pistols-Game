@@ -22,8 +22,8 @@ class GameWindow:
         self.waiting_room()
 
     def send_action(self, action):
-        # Update the last action time
-        self.last_action_time = time.time()
+
+        self.check_activity = False
 
         # Disable actions while waiting for response
         self.disable_actions()
@@ -61,7 +61,7 @@ class GameWindow:
 
         # Update the info label
         if reconnect:
-            self.info_label.config(text="Reconnecting... Please wait.")
+            self.info_label.config(text="Opponent is reconnecting...")
         else:
             self.info_label.config(text="Waiting for response...")
 
@@ -139,6 +139,11 @@ class GameWindow:
                 elif state_message == "End":
                     print("Round ended. Processing results...")
                     self.get_player_state()
+                    
+                    # Update the last action time
+                    self.last_action_time = time.time()
+                    self.check_activity = True
+
                     self.root.after(1000, self.enable_actions)
             else:
                 print(f"Failed to get round state: {response.get('message')}")
@@ -207,6 +212,7 @@ class GameWindow:
     def check_inactivity(self):
 
         if not self.check_activity:
+            self.root.after(CHECK_INTERVAL, self.check_inactivity)
             return
 
         current_time = time.time()
