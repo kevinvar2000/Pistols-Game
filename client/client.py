@@ -40,6 +40,9 @@ class Client:
 
 
     def send_hello(self):
+
+        print("Sending hello message to the server...")
+
         # Send a hello message to the server
         response = self.send_request("request_type=hello", "hello")
         print(f"Hello response: {response}")
@@ -118,6 +121,9 @@ class Client:
         return response
 
     def ping(self):
+
+        print("Starting pinging...")
+
         # Periodically send ping requests to the server
         while True:
             try:
