@@ -398,7 +398,7 @@ func get_player_state(player *Player) {
 		return
 	}
 
-	if player.game.game_state != "running" {
+	if player.game.game_state != "running" && !strings.HasPrefix(player.game.game_state, "over") {
 		fmt.Println("Game is not running.")
 		player.conn.Write([]byte("response_type=player_state&status_code=400&message=Game not running\n"))
 		return
@@ -426,7 +426,7 @@ func get_opponent_state(player *Player) {
 		return
 	}
 
-	if player.game.game_state != "running" {
+	if player.game.game_state != "running" && !strings.HasPrefix(player.game.game_state, "over") {
 		fmt.Println("Game is not running.")
 		player.conn.Write([]byte("response_type=opponent_state&status_code=400&message=Game not running\n"))
 		return
@@ -476,30 +476,37 @@ func get_game_result(player *Player) {
 
 	var game_state, winner_name, player_name string
 
+	// Get the player's game state
 	player.mutex.Lock()
 	game := player.game
 	player_name = player.name
 	player.mutex.Unlock()
 
+	// Check if the player is registered in a game
 	if game == nil {
 		fmt.Println("Player is not registered in any game.")
 		player.conn.Write([]byte("response_type=game_result&status_code=400&message=Player not in game\n"))
 		return
 	}
 
+	// Get the game state
 	game.mutex.Lock()
 	game_state = game.game_state
-	if strings.HasPrefix(game_state, "over:winner") {
-		winner_name = strings.TrimPrefix(game_state, "over:winner:")
-	}
 	game.mutex.Unlock()
 
+	// Check if the game is over
 	if !strings.HasPrefix(game_state, "over") {
 		fmt.Println("Game is not over.")
 		player.conn.Write([]byte("response_type=game_result&status_code=400&message=Game not over\n"))
 		return
 	}
 
+	// Check if the game is a draw or has a winner
+	if strings.HasPrefix(game_state, "over:winner") {
+		winner_name = strings.TrimPrefix(game_state, "over:winner:")
+	}
+
+	// Send the game result to the player
 	if game_state == "over:draw" {
 		fmt.Println("Game is a draw.")
 		player.conn.Write([]byte("response_type=game_result&status_code=200&message=Draw\n"))
