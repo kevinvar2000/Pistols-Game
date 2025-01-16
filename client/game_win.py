@@ -93,6 +93,9 @@ class GameWindow:
         # Display a waiting message
         waiting_label = tk.Label(self.root, text="Waiting for other player to join...", font=LABEL_FONT)
         waiting_label.pack(pady=50)
+
+        self.error_label = tk.Label(self.root, text="", font=LABEL_FONT, fg=ERROR_FG, bg=ERROR_BG, relief="solid", wraplength=400, justify="center")
+
         self.root.update_idletasks()
 
         # Check if the game is ready
@@ -172,7 +175,7 @@ class GameWindow:
         self.info_label = tk.Label(self.root, text="Choose an action:", font=LABEL_FONT, bg=LABEL_BG, fg=LABEL_FG)
         self.info_label.pack(pady=10)
 
-        self.error_label = tk.Label(self.root, text="", font=LABEL_FONT, fg=ERROR_FG, bg=ERROR_BG, relief="solid")
+        self.error_label = tk.Label(self.root, text="", font=LABEL_FONT, fg=ERROR_FG, bg=ERROR_BG, relief="solid", wraplength=400, justify="center")
 
         # Buttons for actions
         tk.Button(self.root, text="Shoot", font=BUTTON_FONT, command=self.shoot, width=ELEMENT_SIZE, bg=BTN_BG, fg=BTN_FG).pack(pady=5)
