@@ -89,7 +89,7 @@ func handle_connection(conn net.Conn) {
 		request := strings.TrimPrefix(message, "request_type=")
 
 		// Handle ping requests
-		if strings.HasPrefix(request, "ping") {
+		if request == "ping" {
 			ping(conn)
 			continue
 		}
@@ -100,7 +100,7 @@ func handle_connection(conn net.Conn) {
 			fmt.Println("First message:", request)
 
 			// Check if the first message is a hello message
-			if !strings.HasPrefix(request, "hello") {
+			if request != "hello" {
 				fmt.Println("Invalid first message.")
 				conn.Write([]byte("response_type=hello&status_code=400&message=Invalid first message\n"))
 				handle_disconnection(player)
@@ -113,29 +113,36 @@ func handle_connection(conn net.Conn) {
 			}
 		}
 
+		// Handle hello messages if sent after the first message
+		if request == "hello" {
+			fmt.Println("Hello message received again.")
+			conn.Write([]byte("response_type=hello&status_code=200&message=Hello again\n"))
+			continue
+		}
+
 		// Handle registered player requests
 		if is_registered {
 			fmt.Printf("Player %s sent request: %s\n", player.name, request)
 
 			switch {
-			case strings.HasPrefix(request, "game_ready"):
+			case request == "game_ready":
 				game_ready(player)
-			case strings.HasPrefix(request, "player_state"):
+			case request == "player_state":
 				get_player_state(player)
-			case strings.HasPrefix(request, "opponent_state"):
+			case request == "opponent_state":
 				get_opponent_state(player)
-			case strings.HasPrefix(request, "close_game"):
+			case request == "close_game":
 				close_game(player)
 				return
-			case strings.HasPrefix(request, "reset_game"):
+			case request == "reset_game":
 				reset_game(player)
 			case strings.HasPrefix(request, "action"):
 				set_player_action(player, request)
-			case strings.HasPrefix(request, "game_result"):
+			case request == "game_result":
 				get_game_result(player)
-			case strings.HasPrefix(request, "round_state"):
+			case request == "round_state":
 				get_round_state(player)
-			case strings.HasPrefix(request, "game_state"):
+			case request == "game_state":
 				get_game_state(player)
 			default:
 				invalid_message(conn)
