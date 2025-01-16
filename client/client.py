@@ -63,7 +63,6 @@ class Client:
 
 
     def send_request(self, request, request_type):
-        retries = 0
 
         with self.lock:
             try:
@@ -73,39 +72,39 @@ class Client:
                 print(f"Sending request: {request}")
                 self.socket.sendall(request.encode('utf-8'))
 
-                # Wait for the correct response type
-                while retries < MAX_RETRIES:
+                try:
+                    # Set a timeout for receiving the response
+                    self.socket.settimeout(REQUEST_INTERVAL)
                     response_data = self.socket.recv(BUFFER_SIZE).decode('utf-8')
-                    # print(f"Received raw response: {response_data}")
+                except socket.timeout:
+                    raise TimeoutError("Did not receive a response in time.")
 
-                    if not response_data:
-                        print("No data received. Retrying...")
-                        retries += 1
-                        time.sleep(REQUEST_INTERVAL)  # Wait briefly before retrying
-                        continue
+                if not response_data:
+                    raise ValueError("Received empty response from the server.")
 
-                    response = self.parse_response(response_data)
-                    # print(f"Parsed response: {response}")
+                response = self.parse_response(response_data)
 
-                    if response.get("response_type") == request_type:
-                        return response
+                if response.get("response_type") == request_type:
+                    return response
+                else:
+                    print(f"Unexpected response: {response}")
+                    raise ValueError("Unexpected response type.")
 
-                    print(f"Ignored unrelated response: {response}")
-                    retries += 1
-                    time.sleep(REQUEST_INTERVAL)
-
-                    print(f"Retrying request {retries}/{MAX_RETRIES}...")
-
-                    # Optionally, track unrelated responses for analysis
-                    with open("unrelated_responses.log", "a") as log_file:
-                        print(f"Ignored unrelated response: {response}", file=log_file)
-                        log_file.write(f"{response}\n")
-
-                # If maximum retries are exceeded
-                raise TimeoutError("Did not receive the expected response in time.")
+            except TimeoutError as te:
+                print(f"Request timed out: {te}")
+                self.close()  # Close the socket as the server is unresponsive
+                return {"status": "error", "message": str(te)}
+            except ConnectionError as ce:
+                print(f"Connection error: {ce}")
+                self.close()  # Close the connection to reset
+                return {"status": "error", "message": str(ce)}
+            except ValueError as ve:
+                print(f"Response error: {ve}")
+                self.close()  # Close the connection if response type is unexpected
+                return {"status": "error", "message": str(ve)}
             except Exception as e:
-                (f"Error sending request: {e}")
-                self.connect()
+                print(f"Unexpected error: {e}")
+                self.close()  # Always close the connection on critical failure
                 return {"status": "error", "message": str(e)}
 
     def parse_response(self, response_data):
@@ -141,7 +140,7 @@ class Client:
         print(f"Close response: {response}")
 
         if response.get("response_type") == "close_game":
-            if response.get("status") == "200":
+            if response.get("status_code") == "200":
                 print("Server closed the connection.")
             else:
                 print("Failed to close the connection.")
