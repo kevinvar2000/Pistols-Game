@@ -42,9 +42,10 @@ class GameWindow:
                 print(f"Failed to send action: {response.get('message')}")
                 self.update_labels(error_message=response.get("message"))
                 self.root.after(REQUEST_INTERVAL, lambda: self.send_action(action))
-        else:
-            print(f"Ignoring unrelated response: {response}")
-            self.root.after(REQUEST_INTERVAL, lambda: self.send_action(action))
+        elif response.get("status") == "error":
+            print(f"Response error: {response.get('message')}")
+            self.update_labels(error_message=response.get("message"))
+            self.root.after(REQUEST_INTERVAL, self.return_to_connect_window)
 
     def shoot(self):
         self.send_action("request_type=action&action_type=shoot")
@@ -112,9 +113,10 @@ class GameWindow:
             else:
                 print(f"Game not ready: {response.get('message')}")
                 self.root.after(REQUEST_INTERVAL, self.check_game_ready)
-        else:
-            print(f"Ignoring unrelated response: {response}")
-            self.root.after(REQUEST_INTERVAL, self.check_game_ready)
+        elif response.get("status") == "error":
+            print(f"Response error: {response.get('message')}")
+            self.update_labels(error_message=response.get("message"))
+            self.root.after(REQUEST_INTERVAL, self.return_to_connect_window)
 
     def check_round_state(self):
         print("*** Checking round state ***")
@@ -139,9 +141,10 @@ class GameWindow:
                 print(f"Failed to get round state: {response.get('message')}")
                 self.update_labels(error_message=response.get("message"))
                 self.root.after(REQUEST_INTERVAL, self.check_round_state)
-        else:
-            print(f"Ignoring unrelated response: {response}")
-            self.root.after(REQUEST_INTERVAL, self.check_round_state)
+        elif response.get("status") == "error":
+            print(f"Response error: {response.get('message')}")
+            self.update_labels(error_message=response.get("message"))
+            self.root.after(REQUEST_INTERVAL, self.return_to_connect_window)
 
     def load_game(self):
         print("*** Loading game window ***")
@@ -252,10 +255,11 @@ class GameWindow:
             print("Received 'game_ready' during player state check. Retrying...")
             self.root.after(REQUEST_INTERVAL, self.get_player_state)
             return
-        else:
-            print(f"Ignoring unrelated response: {response}")
-            self.root.after(REQUEST_INTERVAL, self.get_player_state)
-            return        
+        elif response.get("status") == "error":
+            print(f"Response error: {response.get('message')}")
+            self.update_labels(error_message=response.get("message"))
+            self.root.after(REQUEST_INTERVAL, self.return_to_connect_window)
+            return
 
         # Check the game result
         self.check_game_result()
@@ -299,9 +303,10 @@ class GameWindow:
             print("Received 'game_ready' during opponent state check. Retrying...")
             self.root.after(REQUEST_INTERVAL, self.get_opponent_state)
             return
-        else:
-            print(f"Ignoring unrelated response: {response}")
-            self.root.after(REQUEST_INTERVAL, self.get_opponent_state)
+        elif response.get("status") == "error":
+            print(f"Response error: {response.get('message')}")
+            self.update_labels(error_message=response.get("message"))
+            self.root.after(REQUEST_INTERVAL, self.return_to_connect_window)
 
     def check_game_result(self):
         print("*** Checking game result ***")
@@ -341,9 +346,10 @@ class GameWindow:
                 print(f"Failed to get game result: {response.get('message')}")
                 self.update_labels(error_message=response.get("message"))
                 self.root.after(REQUEST_INTERVAL, self.check_game_result)
-        else:
-            print(f"Ignoring unrelated response: {response}")
-            self.root.after(REQUEST_INTERVAL, self.check_game_result)
+        elif response.get("status") == "error":
+            print(f"Response error: {response.get('message')}")
+            self.update_labels(error_message=response.get("message"))
+            self.root.after(REQUEST_INTERVAL, self.return_to_connect_window)
 
 
     def check_game_state(self):
@@ -398,9 +404,10 @@ class GameWindow:
                 print(f"Failed to get game state: {response.get('message')}")
                 self.update_labels(error_message=response.get("message"))
                 self.root.after(CHECK_INTERVAL, self.check_game_state)
-        else:
-            print(f"Ignoring unrelated response: {response}")
-            self.root.after(CHECK_INTERVAL, self.check_game_state)
+        elif response.get("status") == "error":
+            print(f"Response error: {response.get('message')}")
+            self.update_labels(error_message=response.get("message"))
+            self.root.after(REQUEST_INTERVAL, self.return_to_connect_window)
 
 
     def ask_play_again(self, result_message):
@@ -436,9 +443,10 @@ class GameWindow:
                 print(f"Failed to reset game: {response.get('message')}")
                 self.update_labels(error_message=response.get("message"))
                 self.root.after(REQUEST_INTERVAL, self.reset_game)
-        else:
-            print(f"Ignoring unrelated response: {response}")
-            self.root.after(REQUEST_INTERVAL, self.reset_game)
+        elif response.get("status") == "error":
+            print(f"Response error: {response.get('message')}")
+            self.update_labels(error_message=response.get("message"))
+            self.root.after(REQUEST_INTERVAL, self.return_to_connect_window)
 
     def update_labels(self, health=None, ammo=None, opponent_health=None, info_message=None, error_message=None):
         print("*** Updating labels ***")
@@ -492,3 +500,17 @@ class GameWindow:
 
         # Destroy the root window
         self.root.destroy()
+
+    
+    def return_to_connect_window(self):
+        print("*** Returning to connect window ***")
+
+        # Cancel all pending callbacks
+        self.cancel_callbacks()
+
+        # Destroy the root window
+        self.root.destroy()
+
+        # Return to the connect window
+        from connect_win import ConnectWindow
+        ConnectWindow()
