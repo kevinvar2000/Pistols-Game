@@ -10,6 +10,7 @@ class Client:
         self.server_ip = None
         self.server_port = None
         self.lock = threading.Lock()  # Lock to ensure thread safety
+        self.pinging = False
 
     def connect(self):
         try:
@@ -22,6 +23,8 @@ class Client:
             # Send a hello message to the server
             if not self.send_hello():
                 return False
+
+            self.pinging = True
 
             # Start a new thread to send periodic ping requests to the server
             threading.Thread(target=self.ping, daemon=True).start()
@@ -87,7 +90,6 @@ class Client:
                 if response.get("response_type") == request_type:
                     return response
                 else:
-                    print(f"Unexpected response: {response}")
                     raise ValueError("Unexpected response type.")
 
             except TimeoutError as te:
@@ -124,15 +126,24 @@ class Client:
         print("Starting pinging...")
 
         # Periodically send ping requests to the server
-        while True:
+        while self.pinging:
             try:
                 response = self.send_request("request_type=ping", "ping")
                 print(f"Ping response: {response}")
             except Exception as e:
                 print(f"Ping failed: {e}")
-                self.connect()
-                break
-            time.sleep(PING_INTERVAL)
+
+                self.pinging = False
+
+                # Attempt to reconnect to the server
+                if not self.connect():
+                    print("Failed to reconnect to the server.")
+                    return
+                
+                self.pinging = True
+            finally:
+                if self.pinging:
+                    time.sleep(PING_INTERVAL)
 
     def close_game(self):
         # Send a request to close the connection with the server
@@ -142,12 +153,16 @@ class Client:
         if response.get("response_type") == "close_game":
             if response.get("status_code") == "200":
                 print("Server closed the connection.")
+                self.pinging = False
             else:
                 print("Failed to close the connection.")
         else:
             print("Unexpected response while closing the connection.")
 
     def close(self):
+
+        self.pinging = False
+
         # Close the socket connection
         if self.socket:
             self.socket.close()
