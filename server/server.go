@@ -164,7 +164,7 @@ func handle_connection(conn net.Conn) {
 				go wait_for_players(player)
 			} else {
 				// invalid_message(conn)
-				conn.Write([]byte("response_type=error&status_code=400&message=Player not registered\n"))
+				conn.Write([]byte("response_type=error&status_code=403&message=Player not registered\n"))
 			}
 		}
 	}

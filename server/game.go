@@ -90,17 +90,17 @@ func game_ready(player *Player) {
 			player.conn.Write([]byte("response_type=game_ready&status_code=200&message=Game ready\n"))
 		} else if player.game.game_state == "waiting" {
 			fmt.Println("Game is in waiting state.")
-			player.conn.Write([]byte("response_type=game_ready&status_code=400&message=Game waiting\n"))
+			player.conn.Write([]byte("response_type=game_ready&status_code=200&message=Game waiting\n"))
 		} else if player.game.game_state == "reconnect" {
 			fmt.Println("Game is waiting for player to reconnect.")
-			player.conn.Write([]byte("response_type=game_ready&status_code=400&message=Game reconnect\n"))
+			player.conn.Write([]byte("response_type=game_ready&status_code=200&message=Game reconnect\n"))
 		} else {
 			fmt.Println("Game is over.")
-			player.conn.Write([]byte("response_type=game_ready&status_code=400&message=Game over\n"))
+			player.conn.Write([]byte("response_type=game_ready&status_code=409&message=Game over\n"))
 		}
 	} else {
 		fmt.Println("Game is not ready.")
-		player.conn.Write([]byte("response_type=game_ready&status_code=400&message=Game not ready\n"))
+		player.conn.Write([]byte("response_type=game_ready&status_code=404&message=Game not ready\n"))
 	}
 }
 
@@ -241,21 +241,21 @@ func set_player_action(player *Player, message string) {
 	// Check if player is registered in a game
 	if player.game == nil {
 		fmt.Println("Player is not registered in any game.")
-		player.conn.Write([]byte("response_type=action&status_code=400&message=Player not in game\n"))
+		player.conn.Write([]byte("response_type=action&status_code=403&message=Player not in game\n"))
 		return
 	}
 
 	// Check if game is running
 	if player.game.game_state != "running" {
 		fmt.Println("Game is not running.")
-		player.conn.Write([]byte("response_type=action&status_code=400&message=Game not running\n"))
+		player.conn.Write([]byte("response_type=action&status_code=409&message=Game not running\n"))
 		return
 	}
 
 	// Check if player is dead
 	if player.player_state.action != "" {
 		fmt.Println("Player action already set.")
-		player.conn.Write([]byte("response_type=action&status_code=400&message=Action already set\n"))
+		player.conn.Write([]byte("response_type=action&status_code=409&message=Action already set\n"))
 		return
 	}
 
@@ -394,13 +394,13 @@ func get_player_state(player *Player) {
 
 	if player.game == nil {
 		fmt.Println("Player is not registered in any game.")
-		player.conn.Write([]byte("response_type=player_state&status_code=400&message=Player not in game\n"))
+		player.conn.Write([]byte("response_type=player_state&status_code=403&message=Player not in game\n"))
 		return
 	}
 
 	if player.game.game_state != "running" && !strings.HasPrefix(player.game.game_state, "over") {
 		fmt.Println("Game is not running.")
-		player.conn.Write([]byte("response_type=player_state&status_code=400&message=Game not running\n"))
+		player.conn.Write([]byte("response_type=player_state&status_code=409&message=Game not running\n"))
 		return
 	}
 
@@ -422,13 +422,13 @@ func get_opponent_state(player *Player) {
 
 	if player.game == nil {
 		fmt.Println("Player is not registered in any game.")
-		player.conn.Write([]byte("response_type=opponent_state&status_code=400&message=Player not in game\n"))
+		player.conn.Write([]byte("response_type=opponent_state&status_code=403&message=Player not in game\n"))
 		return
 	}
 
 	if player.game.game_state != "running" && !strings.HasPrefix(player.game.game_state, "over") {
 		fmt.Println("Game is not running.")
-		player.conn.Write([]byte("response_type=opponent_state&status_code=400&message=Game not running\n"))
+		player.conn.Write([]byte("response_type=opponent_state&status_code=409&message=Game not running\n"))
 		return
 	}
 
@@ -485,7 +485,7 @@ func get_game_result(player *Player) {
 	// Check if the player is registered in a game
 	if game == nil {
 		fmt.Println("Player is not registered in any game.")
-		player.conn.Write([]byte("response_type=game_result&status_code=400&message=Player not in game\n"))
+		player.conn.Write([]byte("response_type=game_result&status_code=403&message=Player not in game\n"))
 		return
 	}
 
@@ -497,7 +497,7 @@ func get_game_result(player *Player) {
 	// Check if the game is over
 	if !strings.HasPrefix(game_state, "over") {
 		fmt.Println("Game is not over.")
-		player.conn.Write([]byte("response_type=game_result&status_code=400&message=Game not over\n"))
+		player.conn.Write([]byte("response_type=game_result&status_code=409&message=Game not over\n"))
 		return
 	}
 
@@ -543,7 +543,7 @@ func get_game_state(player *Player) {
 
 	if game == nil {
 		fmt.Println("Player is not registered in any game.")
-		player.conn.Write([]byte("response_type=game_state&status_code=400&message=Player not in game\n"))
+		player.conn.Write([]byte("response_type=game_state&400&message=Player not in game\n"))
 		return
 	}
 
@@ -579,7 +579,7 @@ func get_round_state(player *Player) {
 
 	if player.game == nil {
 		fmt.Println("Player is not registered in any game.")
-		player.conn.Write([]byte("response_type=round_state&status_code=400&message=Player not in game\n"))
+		player.conn.Write([]byte("response_type=round_state&400&message=Player not in game\n"))
 		return
 	}
 
