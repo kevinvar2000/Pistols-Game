@@ -134,7 +134,7 @@ class GameWindow:
                 elif state_message == "End":
                     print("Round ended. Processing results...")
                     self.get_player_state()
-                    self.root.after(2000, self.enable_actions)
+                    self.root.after(1000, self.enable_actions)
             else:
                 print(f"Failed to get round state: {response.get('message')}")
                 self.update_labels(error_message=response.get("message"))
