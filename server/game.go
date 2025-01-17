@@ -100,7 +100,7 @@ func game_ready(player *Player) {
 		}
 	} else {
 		fmt.Println("Game is not ready.")
-		player.conn.Write([]byte("response_type=game_ready&status_code=404&message=Game not ready\n"))
+		player.conn.Write([]byte("response_type=game_ready&status_code=400&message=Game not ready\n"))
 	}
 }
 
@@ -543,7 +543,7 @@ func get_game_state(player *Player) {
 
 	if game == nil {
 		fmt.Println("Player is not registered in any game.")
-		player.conn.Write([]byte("response_type=game_state&400&message=Player not in game\n"))
+		player.conn.Write([]byte("response_type=game_state&status_code=403&message=Player not in game\n"))
 		return
 	}
 
@@ -579,7 +579,7 @@ func get_round_state(player *Player) {
 
 	if player.game == nil {
 		fmt.Println("Player is not registered in any game.")
-		player.conn.Write([]byte("response_type=round_state&400&message=Player not in game\n"))
+		player.conn.Write([]byte("response_type=round_state&status_code=403&message=Player not in game\n"))
 		return
 	}
 
@@ -601,7 +601,7 @@ func reset_game(player *Player) {
 
 	if player.game == nil {
 		fmt.Println("Player is not registered in any game.")
-		player.conn.Write([]byte("response_type=reset_game&status_code=400&message=Player not in game\n"))
+		player.conn.Write([]byte("response_type=reset_game&status_code=403&message=Player not in game\n"))
 		return
 	}
 

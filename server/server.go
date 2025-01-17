@@ -176,7 +176,7 @@ func register_player(conn net.Conn, request string) *Player {
 	// Check if the request is valid
 	if !strings.HasPrefix(request, "name&name=") {
 		fmt.Println("Invalid name request.")
-		conn.Write([]byte("response_type=error&status_code=400&message=Invalid name request\n"))
+		conn.Write([]byte("response_type=name&status_code=400&message=Invalid name request\n"))
 		return nil
 	}
 
@@ -186,14 +186,14 @@ func register_player(conn net.Conn, request string) *Player {
 	// Check if the player name is empty
 	if len(player_name) == 0 || player_name == "" {
 		fmt.Println("Empty player name received.")
-		conn.Write([]byte("response_type=error&status_code=400&message=Empty player name\n"))
+		conn.Write([]byte("response_type=name&status_code=400&message=Empty player name\n"))
 		return nil
 	}
 
 	// Check if the player name is too long
 	if len(player_name) > MAX_PLAYER_NAME_LENGTH {
 		fmt.Println("Player name too long.")
-		conn.Write([]byte("response_type=error&status_code=400&message=Player name too long\n"))
+		conn.Write([]byte("response_type=name&status_code=400&message=Player name too long\n"))
 		return nil
 	}
 
