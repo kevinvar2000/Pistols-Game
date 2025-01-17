@@ -38,6 +38,16 @@ class GameWindow:
             if response.get("status_code") == "200":
                 # Check the round state if action was successful
                 self.check_round_state()
+            elif response.get("status_code") == "400":
+                print(f"Invalid action: {response.get('message')}")
+                self.update_labels(error_message=response.get("message"))
+                self.root.after(REQUEST_INTERVAL, self.enable_actions)
+            elif response.get("status_code") == "403":
+                print("Player not in game. Returning to connect window...")
+                self.return_to_connect_window()
+            elif response.get("status_code") == "409":
+                print("Game is not running yet or action is already set. Checking again shortly...")
+                self.root.after(REQUEST_INTERVAL, self.send_action, action)
             else:
                 print(f"Failed to send action: {response.get('message')}")
                 self.update_labels(error_message=response.get("message"))
@@ -145,6 +155,9 @@ class GameWindow:
                     self.check_activity = True
 
                     self.root.after(1000, self.enable_actions)
+            elif response.get("status_code") == "403":
+                print("Player not in game. Returning to connect window...")
+                self.return_to_connect_window()
             else:
                 print(f"Failed to get round state: {response.get('message')}")
                 self.update_labels(error_message=response.get("message"))
@@ -255,6 +268,14 @@ class GameWindow:
                         self.update_labels(error_message="Error parsing player state")
                         self.root.after(REQUEST_INTERVAL, self.get_player_state)
                         return
+            elif response.get("status_code") == "403":
+                print("Player not in game. Returning to connect window...")
+                self.return_to_connect_window()
+                return
+            elif response.get("status_code") == "409":
+                print("Game is not running yet. Checking again shortly...")
+                self.root.after(REQUEST_INTERVAL, self.get_player_state)
+                return
             else:
                 print(f"Failed to get player state: {response.get('message')}")
                 self.update_labels(error_message=response.get("message"))
@@ -303,6 +324,13 @@ class GameWindow:
                         self.update_labels(error_message="Error parsing opponent state")
                         self.root.after(REQUEST_INTERVAL, self.get_opponent_state)
                         return
+            elif response.get("status_code") == "403":
+                print("Player not in game. Returning to connect window...")
+                self.return_to_connect_window()
+                return
+            elif response.get("status_code") == "409":
+                print("Game is not running yet. Checking again shortly...")
+                self.root.after(REQUEST_INTERVAL, self.get_opponent_state)
             else:
                 print(f"Failed to get opponent state: {response.get('message')}")
                 self.update_labels(error_message=response.get("message"))
@@ -348,9 +376,12 @@ class GameWindow:
 
                 # Ask player to play again or quit
                 self.root.after(REQUEST_INTERVAL, lambda: self.ask_play_again(result_message))
-            elif response.get("status_code") == "400":
+            elif response.get("status_code") == "409":
                 print("Game is still running... Fetching opponent state.")
                 self.get_opponent_state()
+            elif response.get("status_code") == "403":
+                print("Player not in game. Returning to connect window...")
+                self.return_to_connect_window()
             else:
                 print(f"Failed to get game result: {response.get('message')}")
                 self.update_labels(error_message=response.get("message"))
