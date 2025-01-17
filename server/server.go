@@ -144,6 +144,8 @@ func handle_connection(conn net.Conn) {
 				get_round_state(player)
 			case request == "game_state":
 				get_game_state(player)
+			case strings.HasPrefix(request, "name"):
+				conn.Write([]byte("response_type=error&status_code=403&message=Player already registered\n"))
 			default:
 				invalid_message(conn)
 				handle_disconnection(player)
