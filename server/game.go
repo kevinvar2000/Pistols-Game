@@ -645,7 +645,11 @@ func close_game(player *Player) {
 		if len(player.game.players) == 0 {
 			fmt.Println("No players left in the game. Cleaning up game state.")
 			player.game.game_state = "waiting" // Reset game state for reuse
-			clear(disconnected_players)
+			// clear(disconnected_players)
+			// clear disconnected players list
+			for key := range disconnected_players {
+				delete(disconnected_players, key)
+			}
 		} else {
 			fmt.Println("Game waiting for player to reconnect.")
 			player.game.game_state = "reconnect"
@@ -696,7 +700,10 @@ func start_reconnect_timer(game *Game) {
 		game.game_state = "over:exit"
 
 		// Clear disconnected players list
-		clear(disconnected_players)
+		// clear(disconnected_players)
+		for key := range disconnected_players {
+			delete(disconnected_players, key)
+		}
 	}
 	game.mutex.Unlock()
 }
