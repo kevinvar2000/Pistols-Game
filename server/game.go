@@ -605,6 +605,12 @@ func reset_game(player *Player) {
 		return
 	}
 
+	if player.game.game_state == "running" {
+		fmt.Println("Game is running.")
+		player.conn.Write([]byte("response_type=reset_game&status_code=409&message=Game running\n"))
+		return
+	}
+
 	fmt.Println("Resetting the game state.")
 	player.game.game_state = "waiting" // Reset game state for reuse
 
