@@ -1,7 +1,7 @@
 import time
 import socket
 import threading
-from const import BUFFER_SIZE, PING_INTERVAL, REQUEST_INTERVAL, MAX_RETRIES
+from const import BUFFER_SIZE, PING_INTERVAL, REQUEST_INTERVAL
 
 class Client:
 
