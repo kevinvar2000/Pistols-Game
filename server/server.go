@@ -125,12 +125,33 @@ func handle_connection(conn net.Conn) {
 			fmt.Printf("Player %s sent request: %s\n", player.name, request)
 
 			switch {
-			case request == "game_ready":
-				game_ready(player)
-			case request == "player_state":
-				get_player_state(player)
-			case request == "opponent_state":
-				get_opponent_state(player)
+			case request == "start_game":
+
+				if player == nil {
+					fmt.Println("Player is nil.")
+					conn.Write([]byte("response_type=start_game&status_code=403&message=Player not registered\n"))
+					continue
+				}
+
+				// Check if the player is already in a game
+				if player.game != nil {
+
+					if player.game.game_state == "running" {
+						conn.Write([]byte("response_type=start_game&status_code=403&message=Game already running\n"))
+						continue
+					}
+
+				}
+
+				if player.player_state.is_dead {
+					conn.Write([]byte("response_type=start_game&status_code=403&message=Player is dead, send reset_game\n"))
+					continue
+				}
+
+				go wait_for_players(player)
+
+			case request == "game_state":
+				get_game_state_req(player)
 			case request == "close_game":
 				close_game(player)
 				return
@@ -138,12 +159,6 @@ func handle_connection(conn net.Conn) {
 				reset_game(player)
 			case strings.HasPrefix(request, "action"):
 				set_player_action(player, request)
-			case request == "game_result":
-				get_game_result(player)
-			case request == "round_state":
-				get_round_state(player)
-			case request == "game_state":
-				get_game_state(player)
 			case strings.HasPrefix(request, "name"):
 				conn.Write([]byte("response_type=error&status_code=403&message=Player already registered\n"))
 			default:
@@ -163,74 +178,12 @@ func handle_connection(conn net.Conn) {
 
 				is_registered = true
 
-				go wait_for_players(player)
 			} else {
 				// invalid_message(conn)
 				conn.Write([]byte("response_type=error&status_code=403&message=Player not registered\n"))
 			}
 		}
 	}
-}
-
-// register_player registers a new player with the given request
-func register_player(conn net.Conn, request string) *Player {
-
-	// Check if the request is valid
-	if !strings.HasPrefix(request, "name&name=") {
-		fmt.Println("Invalid name request.")
-		conn.Write([]byte("response_type=name&status_code=400&message=Invalid name request\n"))
-		return nil
-	}
-
-	// Extract the player name from the request
-	player_name := strings.TrimPrefix(request, "name&name=")
-
-	// Check if the player name is empty
-	if len(player_name) == 0 || player_name == "" {
-		fmt.Println("Empty player name received.")
-		conn.Write([]byte("response_type=name&status_code=400&message=Empty player name\n"))
-		return nil
-	}
-
-	// Check if the player name is too long
-	if len(player_name) > MAX_PLAYER_NAME_LENGTH {
-		fmt.Println("Player name too long.")
-		conn.Write([]byte("response_type=name&status_code=400&message=Player name too long\n"))
-		return nil
-	}
-
-	fmt.Println("Registering player:", player_name)
-
-	var new_player *Player
-
-	if player, exists := disconnected_players[player_name]; exists {
-		fmt.Println("Player reconnected:", player_name)
-
-		// Reconnect the player
-		new_player = player
-		new_player.conn = conn
-
-		// Update the game's state if necessary
-		player.game.mutex.Lock()
-		player.game.players[player] = true // Ensure the player is re-added to the game's player list
-		player.game.mutex.Unlock()
-
-		// Remove the player from the disconnected players list
-		delete(disconnected_players, player_name)
-
-		// Send a response to the player
-		conn.Write([]byte("response_type=name&status_code=200&message=Player reconnected\n"))
-
-	} else {
-		fmt.Println("New player registered:", player_name)
-
-		new_player = create_player(conn, player_name)
-
-		// Send a response to the player
-		conn.Write([]byte("response_type=name&status_code=200&message=Player registered\n"))
-	}
-
-	return new_player
 }
 
 // handle_disconnection of a player

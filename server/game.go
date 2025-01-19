@@ -11,6 +11,67 @@ import (
 var waiting_players = make(chan *Player, MAX_PLAYERS)
 var disconnected_players = make(map[string]*Player)
 
+// register_player registers a new player with the given request
+func register_player(conn net.Conn, request string) *Player {
+
+	// Check if the request is valid
+	if !strings.HasPrefix(request, "name&name=") {
+		fmt.Println("Invalid name request.")
+		conn.Write([]byte("response_type=name&status_code=400&message=Invalid name request\n"))
+		return nil
+	}
+
+	// Extract the player name from the request
+	player_name := strings.TrimPrefix(request, "name&name=")
+
+	// Check if the player name is empty
+	if len(player_name) == 0 || player_name == "" {
+		fmt.Println("Empty player name received.")
+		conn.Write([]byte("response_type=name&status_code=400&message=Empty player name\n"))
+		return nil
+	}
+
+	// Check if the player name is too long
+	if len(player_name) > MAX_PLAYER_NAME_LENGTH {
+		fmt.Println("Player name too long.")
+		conn.Write([]byte("response_type=name&status_code=400&message=Player name too long\n"))
+		return nil
+	}
+
+	fmt.Println("Registering player:", player_name)
+
+	var new_player *Player
+
+	if player, exists := disconnected_players[player_name]; exists {
+		fmt.Println("Player reconnected:", player_name)
+
+		// Reconnect the player
+		new_player = player
+		new_player.conn = conn
+
+		// Update the game's state if necessary
+		player.game.mutex.Lock()
+		player.game.players[player] = true // Ensure the player is re-added to the game's player list
+		player.game.mutex.Unlock()
+
+		// Remove the player from the disconnected players list
+		delete(disconnected_players, player_name)
+
+		// Send a response to the player
+		conn.Write([]byte("response_type=name&status_code=200&message=Player reconnected\n"))
+
+	} else {
+		fmt.Println("New player registered:", player_name)
+
+		new_player = create_player(conn, player_name)
+
+		// Send a response to the player
+		conn.Write([]byte("response_type=name&status_code=200&message=Player registered\n"))
+	}
+
+	return new_player
+}
+
 // Function to wait for players to join the game
 func wait_for_players(player *Player) {
 	fmt.Println("Waiting for players to join...")
@@ -27,11 +88,10 @@ func wait_for_players(player *Player) {
 
 			fmt.Println("Player", player.name, "is reconnecting...")
 			game = player.game
-			player.game.game_state = "running"
 			player.game.mutex.Unlock()
 
 			fmt.Println("Reconnecting player to the game...")
-			game.start_game()
+			game.start_game(player.name)
 			return
 		} else {
 			fmt.Println("Player's game state is not reconnect.")
@@ -78,29 +138,7 @@ func wait_for_players(player *Player) {
 		}
 
 		// Start the game
-		game.start_game()
-	}
-}
-
-// Function to check if the game is ready
-func game_ready(player *Player) {
-	if player.game != nil {
-		if player.game.game_state == "running" {
-			fmt.Println("Game is ready.")
-			player.conn.Write([]byte("response_type=game_ready&status_code=200&message=Game ready\n"))
-		} else if player.game.game_state == "waiting" {
-			fmt.Println("Game is in waiting state.")
-			player.conn.Write([]byte("response_type=game_ready&status_code=200&message=Game waiting\n"))
-		} else if player.game.game_state == "reconnect" {
-			fmt.Println("Game is waiting for player to reconnect.")
-			player.conn.Write([]byte("response_type=game_ready&status_code=200&message=Game reconnect\n"))
-		} else {
-			fmt.Println("Game is over.")
-			player.conn.Write([]byte("response_type=game_ready&status_code=409&message=Game over\n"))
-		}
-	} else {
-		fmt.Println("Game is not ready.")
-		player.conn.Write([]byte("response_type=game_ready&status_code=400&message=Game not ready\n"))
+		game.start_game("")
 	}
 }
 
@@ -129,10 +167,24 @@ func create_game() *Game {
 }
 
 // Method to start the game
-func (game *Game) start_game() {
+func (game *Game) start_game(reconnecting_player string) {
 	fmt.Println("Starting the game...")
 
 	game.game_state = "running"
+
+	if reconnecting_player == "" {
+		// Send a confirmation response to the players
+		for player := range game.players {
+			get_response(player, "start_game")
+		}
+	} else {
+		// Send a confirmation response to the players
+		for player := range game.players {
+			if player.name == reconnecting_player {
+				get_response(player, "start_game")
+			}
+		}
+	}
 
 	// Start the game loop
 	go game.game_loop()
@@ -158,6 +210,17 @@ func (game *Game) game_loop() {
 
 			// Check player health
 			game.check_player_health()
+
+			game.mutex.Lock()
+			game.round_state = "End"
+			game.mutex.Unlock()
+
+			// Get the game result
+			for player := range game.players {
+				go get_response(player, "action")
+
+			}
+
 		}
 
 		time.Sleep(time.Duration(ROUND_WAIT_TIME) * time.Second)
@@ -208,9 +271,6 @@ func (game *Game) wait_for_all_actions() bool {
 
 		if all_ready {
 			fmt.Println("All players are ready!")
-			game.mutex.Lock()
-			game.round_state = "end"
-			game.mutex.Unlock()
 			return true
 		}
 
@@ -231,8 +291,6 @@ func set_player_action(player *Player, message string) {
 
 	// action&action_type=shoot
 	action := strings.TrimPrefix(message, "action&action_type=")
-
-	fmt.Println("Setting player action:", action)
 
 	// Set the player action
 	player.mutex.Lock()
@@ -264,13 +322,12 @@ func set_player_action(player *Player, message string) {
 	// Check if the action is valid
 	if action != ACTION_SHOOT && action != ACTION_COVER && action != ACTION_RELOAD {
 		fmt.Println("Invalid action:", action)
-		player.conn.Write([]byte("response_type=action&status_code=400&message=Invalid action\n"))
 		return
 	}
 
 	// Set the player action
 	player.player_state.action = action
-	player.conn.Write([]byte("response_type=action&status_code=200&message=Action set\n"))
+	fmt.Println("Player action set:", action)
 }
 
 // Method to check player actions
@@ -386,51 +443,32 @@ func (game *Game) check_player_health() {
 }
 
 // Function to get the player's state
-func get_player_state(player *Player) {
+func get_player_state(player *Player) string {
 	fmt.Println("Getting player state for player:", player.name)
 
 	player.mutex.Lock()
 	defer player.mutex.Unlock()
 
-	if player.game == nil {
-		fmt.Println("Player is not registered in any game.")
-		player.conn.Write([]byte("response_type=player_state&status_code=403&message=Player not in game\n"))
-		return
-	}
-
-	if player.game.game_state != "running" && !strings.HasPrefix(player.game.game_state, "over") {
-		fmt.Println("Game is not running.")
-		player.conn.Write([]byte("response_type=player_state&status_code=409&message=Game not running\n"))
-		return
-	}
+	var player_state string
 
 	if player.player_state.is_dead {
-		fmt.Printf("Player %s is dead.\n", player.name)
-		player.conn.Write([]byte("response_type=player_state&status_code=200&message=Dead\n"))
+		player_state = "player_state=dead"
 	} else {
-		fmt.Printf("Player %s: Health=%d, Ammo=%d\n", player.name, player.player_state.health, player.player_state.ammo)
-		player.conn.Write([]byte(fmt.Sprintf("response_type=player_state&status_code=200&message=Health=%d, Ammo=%d\n", player.player_state.health, player.player_state.ammo)))
+		player_state = fmt.Sprintf("player_state=health=%d,ammo=%d", player.player_state.health, player.player_state.ammo)
 	}
+
+	fmt.Println(player_state)
+	return player_state
 }
 
 // Function to get the opponent's state
-func get_opponent_state(player *Player) {
+func get_opponent_state(player *Player) string {
 	fmt.Println("Getting opponent state for player:", player.name)
 
 	player.mutex.Lock()
 	defer player.mutex.Unlock()
 
-	if player.game == nil {
-		fmt.Println("Player is not registered in any game.")
-		player.conn.Write([]byte("response_type=opponent_state&status_code=403&message=Player not in game\n"))
-		return
-	}
-
-	if player.game.game_state != "running" && !strings.HasPrefix(player.game.game_state, "over") {
-		fmt.Println("Game is not running.")
-		player.conn.Write([]byte("response_type=opponent_state&status_code=409&message=Game not running\n"))
-		return
-	}
+	var opponent_state string
 
 	for opponent := range player.game.players {
 		if opponent != player {
@@ -438,14 +476,16 @@ func get_opponent_state(player *Player) {
 			defer opponent.mutex.Unlock()
 
 			if opponent.player_state.is_dead {
-				fmt.Printf("Opponent %s is dead.\n", opponent.name)
-				player.conn.Write([]byte("response_type=opponent_state&status_code=200&message=Dead\n"))
+				opponent_state = "opponent_state=dead\n"
 			} else {
-				fmt.Printf("Opponent %s: Health=%d\n", opponent.name, opponent.player_state.health)
-				player.conn.Write([]byte(fmt.Sprintf("response_type=opponent_state&status_code=200&message=Health=%d\n", opponent.player_state.health)))
+				opponent_state = fmt.Sprintf("opponent_state=health=%d", opponent.player_state.health)
 			}
+
 		}
 	}
+
+	fmt.Println(opponent_state)
+	return opponent_state
 }
 
 // Method to check if the game is over
@@ -470,126 +510,60 @@ func (game *Game) check_game_over(dead_players []*Player) {
 	}
 }
 
-// Function to get the game result
-func get_game_result(player *Player) {
-	fmt.Println("Getting result for player: ", player.name)
+// Function to get the game state
+func get_game_state_req(player *Player) {
 
-	var game_state, winner_name, player_name string
-
-	// Get the player's game state
-	player.mutex.Lock()
-	game := player.game
-	player_name = player.name
-	player.mutex.Unlock()
-
-	// Check if the player is registered in a game
-	if game == nil {
-		fmt.Println("Player is not registered in any game.")
-		player.conn.Write([]byte("response_type=game_result&status_code=403&message=Player not in game\n"))
-		return
-	}
-
-	// Get the game state
-	game.mutex.Lock()
-	game_state = game.game_state
-	game.mutex.Unlock()
-
-	// Check if the game is over
-	if !strings.HasPrefix(game_state, "over") {
-		fmt.Println("Game is not over.")
-		player.conn.Write([]byte("response_type=game_result&status_code=409&message=Game not over\n"))
-		return
-	}
-
-	// Check if the game is a draw or has a winner
-	if strings.HasPrefix(game_state, "over:winner") {
-		winner_name = strings.TrimPrefix(game_state, "over:winner:")
-	}
-
-	// Send the game result to the player
-	if game_state == "over:draw" {
-		fmt.Println("Game is a draw.")
-		player.conn.Write([]byte("response_type=game_result&status_code=200&message=Draw\n"))
-	} else if winner_name != "" {
-		if player_name == winner_name {
-			fmt.Println("Player", player_name, "won the game.")
-			player.conn.Write([]byte("response_type=game_result&status_code=200&message=Win\n"))
+	if player.game != nil {
+		if player.game.game_state == "running" {
+			fmt.Println("Game is ready.")
+			player.conn.Write([]byte("response_type=game_state&status_code=200&message=Game running\n"))
+		} else if player.game.game_state == "waiting" {
+			fmt.Println("Game is in waiting state.")
+			player.conn.Write([]byte("response_type=game_state&status_code=200&message=Game waiting\n"))
+		} else if player.game.game_state == "reconnect" {
+			fmt.Println("Game is waiting for player to reconnect.")
+			player.conn.Write([]byte("response_type=game_state&status_code=200&message=Game reconnect\n"))
 		} else {
-			fmt.Println("Player", player_name, "lost the game.")
-			player.conn.Write([]byte("response_type=game_result&status_code=200&message=Lose\n"))
+			fmt.Println("Game is over.")
+			player.conn.Write([]byte("response_type=game_state&status_code=200&message=Game over\n"))
 		}
+	} else {
+		fmt.Println("Game is not ready.")
+		player.conn.Write([]byte("response_type=game_state&status_code=400&message=Game not ready\n"))
 	}
-
-	game.mutex.Lock()
-	// Remove player from the game
-	fmt.Println("Removing player", player_name, "from the game.")
-	delete(game.players, player)
-
-	// Check if the game has any players left
-	if len(game.players) == 0 {
-		fmt.Println("No players left in the game. Cleaning up game state.")
-		game.game_state = "waiting" // Reset game state for reuse
-	}
-	game.mutex.Unlock()
 }
 
 // Function to get the game state
-func get_game_state(player *Player) {
+func get_game_state(player *Player) string {
 	fmt.Println("Getting game state...")
 
 	player.mutex.Lock()
 	game := player.game
 	player.mutex.Unlock()
 
-	if game == nil {
-		fmt.Println("Player is not registered in any game.")
-		player.conn.Write([]byte("response_type=game_state&status_code=403&message=Player not in game\n"))
-		return
-	}
-
 	game.mutex.Lock()
 	game_state := game.game_state
 	game.mutex.Unlock()
 
-	if game_state == "running" {
-		fmt.Println("Game is running.")
-		player.conn.Write([]byte("response_type=game_state&status_code=200&message=Running\n"))
-	} else if game_state == "reconnect" {
-		fmt.Println("Game is waiting for player to reconnect.")
-		player.conn.Write([]byte("response_type=game_state&status_code=200&message=Reconnect\n"))
-	} else if game_state == "waiting" {
-		fmt.Println("Game is waiting.")
-		player.conn.Write([]byte("response_type=game_state&status_code=200&message=Waiting\n"))
-	} else if game_state == "over:exit" {
-		fmt.Println("Game is over due to player exit.")
-		player.conn.Write([]byte("response_type=game_state&status_code=200&message=Exit\n"))
-	} else {
-		fmt.Println("Game is over.")
-		player.conn.Write([]byte("response_type=game_state&status_code=200&message=Over\n"))
-	}
-
+	return fmt.Sprintf("game_state=%s", game_state)
 }
 
-// Function to get the round state
-func get_round_state(player *Player) {
-	fmt.Println("Getting round state...")
+// Function to get the response for the player
+func get_response(player *Player, response_type string) {
+	fmt.Println("Getting response for player:", player.name)
 
-	player.mutex.Lock()
-	defer player.mutex.Unlock()
+	player_state := get_player_state(player)
+	opponent_state := get_opponent_state(player)
+	game_state := get_game_state(player)
 
-	if player.game == nil {
-		fmt.Println("Player is not registered in any game.")
-		player.conn.Write([]byte("response_type=round_state&status_code=403&message=Player not in game\n"))
-		return
-	}
+	var message string
 
-	if player.game.round_state == "running" {
-		fmt.Println("Round is running.")
-		player.conn.Write([]byte("response_type=round_state&status_code=200&message=Running\n"))
+	if strings.HasPrefix(game_state, "game_state=over") {
+		message = "&" + player_state + "&" + opponent_state + "&" + game_state + "&" + "message=Game over\n"
 	} else {
-		fmt.Println("Round ended.")
-		player.conn.Write([]byte("response_type=round_state&status_code=200&message=End\n"))
+		message = "&" + player_state + "&" + opponent_state + "&" + game_state + "&" + "message=Send action\n"
 	}
+	player.conn.Write([]byte("response_type=" + response_type + "&status_code=200" + message))
 }
 
 // Function to reset the game
@@ -622,8 +596,6 @@ func reset_game(player *Player) {
 
 	// Send a confirmation response to the player
 	player.conn.Write([]byte("response_type=reset_game&status_code=200&message=Game reset\n"))
-
-	wait_for_players(player)
 }
 
 // Function to close the game

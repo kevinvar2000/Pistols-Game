@@ -17,10 +17,7 @@ const (
 	ACTION_SHOOT           = "SHOOT"  // Action to shoot the opponent
 	ACTION_COVER           = "COVER"  // Action to cover and protect oneself
 	ACTION_RELOAD          = "RELOAD" // Action to reload the weapon
-	ACTION_TIMEOUT         = 20       // Timeout for player actions in seconds
-	ACTION_CHECK_INTERVAL  = 500      // Interval to check player actions in milliseconds
 	ROUND_WAIT_TIME        = 1        // Pause time between rounds in seconds
-	READ_TIMEOUT           = 20       // Time interval to ping clients in seconds
 	READ_DEADLINE          = 30       // Deadline for reading from clients in seconds
 	RECONNECT_TIMEOUT      = 30       // Timeout for client reconnection in seconds
 )
