@@ -35,7 +35,7 @@ func register_player(conn net.Conn, request string) *Player {
 	// Check if the player name is too long
 	if len(player_name) > MAX_PLAYER_NAME_LENGTH {
 		fmt.Println("Player name too long.")
-		conn.Write([]byte("response_type=name&status_code=400&message=Player name too long, max length is " + strconv.Itoa(MAX_PLAYER_NAME_LENGTH) + "\n"))
+		conn.Write([]byte("response_type=name&status_code=400&message=Player name too long, max len is " + strconv.Itoa(MAX_PLAYER_NAME_LENGTH) + " chars\n"))
 		return nil
 	}
 
