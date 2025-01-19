@@ -8,6 +8,8 @@ request_type=start_game
 
 request_type=action&action_type=shoot
 
+request_type=game_state
+
 request_type=reset_game
 
 request_type=close_game
