@@ -1,16 +1,16 @@
 import time
 import tkinter as tk
 from tkinter import messagebox
-from const import WIN_SIZE, BUTTON_FONT, LABEL_FONT, REQUEST_INTERVAL, ELEMENT_SIZE, WIN_BG, BTN_BG, BTN_FG, LABEL_BG, LABEL_FG, ERROR_BG, ERROR_FG, INACTIVE_TIMEOUT, CHECK_INTERVAL
+from const import WIN_SIZE, BUTTON_FONT, LABEL_FONT, REQUEST_INTERVAL, ELEMENT_SIZE, WIN_BG, BTN_BG, BTN_FG, LABEL_BG, LABEL_FG, ERROR_BG, ERROR_FG, INACTIVE_TIMEOUT, CHECK_INTERVAL, DEFAULT_HEALTH, DEFAULT_AMMO
 
 class GameWindow:
     def __init__(self, root, client, client_name):
         self.client = client
         self.client_name = client_name
         self.check_activity = True
-        self.check_result = False
         self.cancel_call = False
         self.after_reconnect = False
+        self.game_over = False
 
         self.root = root
         self.root.title("Game")
@@ -36,8 +36,7 @@ class GameWindow:
 
         if response.get("response_type") == "action":
             if response.get("status_code") == "200":
-                # Check the round state if action was successful
-                self.check_round_state()
+                self.update_game(response)
             elif response.get("status_code") == "400":
                 print(f"Invalid action: {response.get('message')}")
                 self.update_labels(error_message=response.get("message"))
@@ -109,59 +108,61 @@ class GameWindow:
         self.root.update_idletasks()
 
         # Check if the game is ready
-        self.check_game_ready()
+        self.root.after(REQUEST_INTERVAL, self.start_game)
 
-    def check_game_ready(self):
+    def start_game(self):
         print("*** Checking if game is ready ***")
 
         # Send a request to check if the game is ready
-        response = self.client.send_request("request_type=game_ready", "game_ready")
-        print(f"Response in check_game_ready: {response}")
+        response = self.client.send_request("request_type=start_game", "start_game")
+        print(f"Response in start_game: {response}")
 
-        if response.get("response_type") == "game_ready":
+        if response.get("response_type") == "start_game":
             if response.get("status_code") == "200":
+                
                 # Game is ready, load the game window
                 print("Game is ready! Starting the game...")
                 self.load_game()
+
+                if response.get("player_state"):
+                    self.update_player_state(response.get("player_state"))
+                if response.get("opponent_state"):
+                    self.update_opponent_state(response.get("opponent_state"))
+                if response.get("game_state"):
+                    self.update_game_state(response.get("game_state"))
+
             else:
                 print(f"Game not ready: {response.get('message')}")
-                self.root.after(REQUEST_INTERVAL, self.check_game_ready)
+                self.root.after(REQUEST_INTERVAL, self.start_game)
         elif response.get("status") == "error":
             print(f"Response error: {response.get('message')}")
             self.update_labels(error_message=response.get("message"))
             self.root.after(REQUEST_INTERVAL, self.return_to_connect_window)
 
-    def check_round_state(self):
-        print("*** Checking round state ***")
 
-        # Send a request to check the round state
-        response = self.client.send_request("request_type=round_state", "round_state")
-        print(f"Response in check_round_state: {response}")
+    def update_game(self, response):
+        print("*** Updating game ***")
 
-        if response.get("response_type") == "round_state":
-            if response.get("status_code") == "200":
-                state_message = response.get("message").strip()
-                print(f"Round state: {state_message}")
+        # Parsed response: {'response_type': 'action', 'status_code': '200', 'player_state': 'health=3,ammo=0', 'opponent_state': 'health=2', 'game_state': 'running'\n'}
 
-                if state_message == "Running":
-                    print("Round is still running. Checking again shortly...")
-                    self.root.after(REQUEST_INTERVAL, self.check_round_state)
-                elif state_message == "End":
-                    print("Round ended. Processing results...")
-                    self.get_player_state()
-                    
-                    # Update the last action time
-                    self.last_action_time = time.time()
-                    self.check_activity = True
+        if response.get("response_type") == "action" and response.get("status_code") == "200":
 
-                    self.root.after(1000, self.enable_actions)
-            elif response.get("status_code") == "403":
-                print("Player not in game. Returning to connect window...")
-                self.return_to_connect_window()
-            else:
-                print(f"Failed to get round state: {response.get('message')}")
-                self.update_labels(error_message=response.get("message"))
-                self.root.after(REQUEST_INTERVAL, self.check_round_state)
+            if response.get("player_state"):
+                self.update_player_state(response.get("player_state"))
+            if response.get("opponent_state"):
+                self.update_opponent_state(response.get("opponent_state"))
+            if response.get("game_state"):
+                self.update_game_state(response.get("game_state"))
+
+            if self.game_over:
+                print("Game is over. Ending game...")
+                return
+            # Enable actions after updating the game
+            self.root.after(REQUEST_INTERVAL, self.enable_actions)
+
+            self.check_activity = True
+            self.last_action_time = time.time()
+
         elif response.get("status") == "error":
             print(f"Response error: {response.get('message')}")
             self.update_labels(error_message=response.get("message"))
@@ -179,14 +180,14 @@ class GameWindow:
         self.name_label.pack(pady=10)
 
         # Health and Ammo display
-        self.health_label = tk.Label(self.root, text="Health: Loading...", font=LABEL_FONT, bg=LABEL_BG, fg=LABEL_FG)
+        self.health_label = tk.Label(self.root, text=f"Health:{DEFAULT_HEALTH}", font=LABEL_FONT, bg=LABEL_BG, fg=LABEL_FG)
         self.health_label.pack(pady=10)
 
-        self.ammo_label = tk.Label(self.root, text="Ammo: Loading...", font=LABEL_FONT, bg=LABEL_BG, fg=LABEL_FG)
+        self.ammo_label = tk.Label(self.root, text=f"Ammo:{DEFAULT_AMMO}", font=LABEL_FONT, bg=LABEL_BG, fg=LABEL_FG)
         self.ammo_label.pack(pady=10)
 
         # Opponent's Health display
-        self.opponent_health_label = tk.Label(self.root, text="Opponent Health: Loading...", font=LABEL_FONT, bg=LABEL_BG, fg=LABEL_FG)
+        self.opponent_health_label = tk.Label(self.root, text=f"Opponent Health:{DEFAULT_HEALTH}", font=LABEL_FONT, bg=LABEL_BG, fg=LABEL_FG)
         self.opponent_health_label.pack(pady=5)
     
         # Info and Error labels
@@ -207,11 +208,8 @@ class GameWindow:
 
         # Set flags
         self.check_activity = True
-        self.check_result = False
         self.cancel_call = False
-
-        # Start fetching the player state asynchronously
-        self.root.after(0, self.get_player_state)
+        self.game_over = False
 
         # Start checking for inactivity
         self.last_action_time = time.time()
@@ -238,159 +236,45 @@ class GameWindow:
 
         self.root.after(CHECK_INTERVAL, self.check_inactivity)
 
-    def get_player_state(self):
+    def update_player_state(self, player_state):
         print("*** Getting player state ***")
 
-        # Send a request to get the player state
-        response = self.client.send_request("request_type=player_state", "player_state")
-        print(f"Response in get_player_state: {response}")
+        if player_state == "dead":
+            print("Player is dead. Ending game...")
 
-        if response.get("response_type") == "player_state":
-            if response.get("status_code") == "200":
-                state_message = response.get("message").strip()
-                print(f"Player state: {state_message}")
+            # Update the labels
+            self.update_labels(health=0, ammo=0, info_message="You are dead. Game over.")
+        else:
+            try:
+                state_pairs = dict(pair.split("=") for pair in player_state.split(","))
+                self.health = int(state_pairs.get("health", 0))
+                self.ammo = int(state_pairs.get("ammo", 0))
+                print(f"Updated player state: Health={self.health}, Ammo={self.ammo}")
 
-                if state_message == "Dead":
-                    print("Player is dead. Ending game...")
+                self.update_labels(self.health, self.ammo)
+            except (ValueError, KeyError) as e:
+                print(f"Error parsing player state: {e}")
+                self.update_labels(error_message="Error parsing player state")
 
-                    # Update the labels
-                    self.update_labels(health=0, ammo=0, info_message="You are dead. Game over.")
-                else:
-                    try:
-                        state_pairs = dict(pair.split("=") for pair in state_message.split(", "))
-                        self.health = int(state_pairs.get("Health", 0))
-                        self.ammo = int(state_pairs.get("Ammo", 0))
-                        print(f"Updated player state: Health={self.health}, Ammo={self.ammo}")
-
-                        self.update_labels(self.health, self.ammo)
-                    except (ValueError, KeyError) as e:
-                        print(f"Error parsing player state: {e}")
-                        self.update_labels(error_message="Error parsing player state")
-                        self.root.after(REQUEST_INTERVAL, self.get_player_state)
-                        return
-            elif response.get("status_code") == "403":
-                print("Player not in game. Returning to connect window...")
-                self.return_to_connect_window()
-                return
-            elif response.get("status_code") == "409":
-                print("Game is not running yet. Checking again shortly...")
-                self.root.after(REQUEST_INTERVAL, self.get_player_state)
-                return
-            else:
-                print(f"Failed to get player state: {response.get('message')}")
-                self.update_labels(error_message=response.get("message"))
-                self.root.after(REQUEST_INTERVAL, self.get_player_state)
-                return
-        elif response.get("response_type") == "game_ready":
-            print("Received 'game_ready' during player state check. Retrying...")
-            self.root.after(REQUEST_INTERVAL, self.get_player_state)
-            return
-        elif response.get("status") == "error":
-            print(f"Response error: {response.get('message')}")
-            self.update_labels(error_message=response.get("message"))
-            self.root.after(REQUEST_INTERVAL, self.return_to_connect_window)
-            return
-
-        # Check the game result
-        self.check_game_result()
-
-    def get_opponent_state(self):
+    def update_opponent_state(self, opponent_state):
         print("*** Getting opponent state ***")
 
-        # Send a request to get the opponent state
-        response = self.client.send_request("request_type=opponent_state", "opponent_state")
-        print(f"Response in get_opponent_state: {response}")
+        if opponent_state == "dead":
+            print("Opponent is dead. Ending game...")
 
-        if response.get("response_type") == "opponent_state":
-            if response.get("status_code") == "200":
-                state_message = response.get("message").strip()
-                print(f"Opponent state: {state_message}")
+            # Update the labels
+            self.update_labels(opponent_health=0, info_message="Opponent is dead. You win!")
+        elif "health" in opponent_state:
 
-                if state_message == "Dead":
-                    print("Opponent is dead. Ending game...")
+            try:
+                opponent_health = int(opponent_state.split("=")[1].strip())
+                print(f"Updated opponent state: Health={opponent_health}")
+            except ValueError as e:
+                print(f"Error parsing opponent state: {e}")
+                self.update_labels(error_message="Error parsing opponent state")
 
-                    # Update the labels
-                    self.update_labels(opponent_health=0, info_message="Opponent is dead. You win!")
-                else:
-                    try:
-                        state_pairs = dict(pair.split("=") for pair in state_message.split(", "))
-                        opponent_health = int(state_pairs.get("Health", 0))
-                        print(f"Updated opponent state: Health={opponent_health}")
-
-                        # Update opponent state
-                        self.update_labels(opponent_health=opponent_health)
-                    except (ValueError, KeyError) as e:
-                        print(f"Error parsing opponent state: {e}")
-                        self.update_labels(error_message="Error parsing opponent state")
-                        self.root.after(REQUEST_INTERVAL, self.get_opponent_state)
-                        return
-            elif response.get("status_code") == "403":
-                print("Player not in game. Returning to connect window...")
-                self.return_to_connect_window()
-                return
-            elif response.get("status_code") == "409":
-                print("Game is not running yet. Checking again shortly...")
-                self.root.after(REQUEST_INTERVAL, self.get_opponent_state)
-            else:
-                print(f"Failed to get opponent state: {response.get('message')}")
-                self.update_labels(error_message=response.get("message"))
-                self.root.after(REQUEST_INTERVAL, self.get_opponent_state)
-                return
-        elif response.get("response_type") == "game_ready":
-            print("Received 'game_ready' during opponent state check. Retrying...")
-            self.root.after(REQUEST_INTERVAL, self.get_opponent_state)
-            return
-        elif response.get("status") == "error":
-            print(f"Response error: {response.get('message')}")
-            self.update_labels(error_message=response.get("message"))
-            self.root.after(REQUEST_INTERVAL, self.return_to_connect_window)
-
-    def check_game_result(self):
-        print("*** Checking game result ***")
-
-        # Send a request to check the game result
-        response = self.client.send_request("request_type=game_result", "game_result")
-        print(f"Response in check_game_result: {response}")
-
-        if response.get("response_type") == "game_result":
-            if response.get("status_code") == "200":
-                result_message = response.get("message").strip()
-                print(f"Game result: {result_message}")
-
-                self.check_result = True
-
-                if result_message == "Win":
-                    print("You win! Congratulations!")
-                    result_message = "You win! Congratulations!"
-                    self.root.after(0, lambda: self.update_labels(opponent_health=0))
-                elif result_message == "Lose":
-                    print("You lose! Better luck next time!")
-                    result_message = "You lose! Better luck next time!"
-                elif result_message == "Draw":
-                    print("Game ended in a draw.")
-                    result_message = "Game ended in a draw."
-                    self.root.after(0, lambda: self.update_labels(opponent_health=0))
-
-                # Update the labels
-                self.root.after(0, lambda: self.update_labels(info_message=result_message))
-
-                # Ask player to play again or quit
-                self.root.after(REQUEST_INTERVAL, lambda: self.ask_play_again(result_message))
-            elif response.get("status_code") == "409":
-                print("Game is still running... Fetching opponent state.")
-                self.get_opponent_state()
-            elif response.get("status_code") == "403":
-                print("Player not in game. Returning to connect window...")
-                self.return_to_connect_window()
-            else:
-                print(f"Failed to get game result: {response.get('message')}")
-                self.update_labels(error_message=response.get("message"))
-                self.root.after(REQUEST_INTERVAL, self.check_game_result)
-        elif response.get("status") == "error":
-            print(f"Response error: {response.get('message')}")
-            self.update_labels(error_message=response.get("message"))
-            self.root.after(REQUEST_INTERVAL, self.return_to_connect_window)
-
+            # Update opponent state
+            self.update_labels(opponent_health=opponent_health)
 
     def check_game_state(self):
 
@@ -406,40 +290,12 @@ class GameWindow:
 
         if response.get("response_type") == "game_state":
             if response.get("status_code") == "200":
-                state_message = response.get("message").strip()
-                print(f"Game state: {state_message}")
+                message_state = response.get("message").strip()
+                print(f"Message state: {message_state}")
 
-                if state_message == "Exit":
-                    print("Game has ended due to opponent exit.")
-                    self.update_labels(info_message="Opponent has left the game. You win!")
-                    self.root.after(CHECK_INTERVAL, lambda: self.ask_play_again("Opponent has left the game. You win!"))
-                elif state_message == "Reconnect":
-                    print("Game is reconnecting. Waiting for opponent...")
-                    
-                    # Disable actions while reconnecting
-                    self.check_activity = False
-                    self.after_reconnect = True
-                    self.disable_actions(reconnect=True)
+                game_state = message_state.split()[1].strip()
 
-                    self.root.after(CHECK_INTERVAL, self.check_game_state)
-                elif state_message == "Running":
-                    print("Game is still running. Checking again shortly...")
-
-                    # After reconnecting, enable actions
-                    if self.after_reconnect:
-                        print("Game is running after reconnect.")
-                        self.check_activity = True
-                        self.after_reconnect = False
-                        self.enable_actions()
-
-                    self.root.after(CHECK_INTERVAL, self.check_game_state)
-
-                elif state_message == "Over":
-
-                    if self.check_result:
-                        print("Game is over. Checking results...")
-                        self.check_game_result()
-
+                self.update_game_state(game_state)
             else:
                 print(f"Failed to get game state: {response.get('message')}")
                 self.update_labels(error_message=response.get("message"))
@@ -448,6 +304,67 @@ class GameWindow:
             print(f"Response error: {response.get('message')}")
             self.update_labels(error_message=response.get("message"))
             self.root.after(REQUEST_INTERVAL, self.return_to_connect_window)
+
+
+    def update_game_state(self, game_state):
+        print("*** Getting game state ***")
+
+        print(f"Game state: {game_state}")
+
+        if game_state == "running":
+            print("Game is running. Checking game state...")
+            self.root.after(REQUEST_INTERVAL, self.check_game_state)
+
+            if self.after_reconnect:
+                self.enable_actions()
+                self.after_reconnect = False
+                self.check_activity = True
+
+        elif "over:" in game_state:
+            print("Game is over. Resolving game result...")
+            self.resolve_result(game_state)
+        elif game_state == "over":
+            print("Game is over. Checking results...")
+            self.update_labels(info_message="Game over. Checking results...")
+        elif game_state == "waiting":
+            print("Game is waiting for players. Returning to the waiting room...")
+            self.waiting_room()
+        elif game_state == "reconnect":
+            print("Opponent is reconnecting. Disabling actions...")
+            self.disable_actions(reconnect=True)
+            self.after_reconnect = True
+            self.check_activity = False
+            self.root.after(REQUEST_INTERVAL, self.check_game_state)
+        else:
+            print(f"Invalid game state: {game_state}")
+            self.update_labels(error_message="Invalid game state")
+            self.root.after(REQUEST_INTERVAL, self.check_game_state)
+
+
+    def resolve_result(self, game_state):
+        print("*** Resolving game result ***")
+
+        game_result = "Game over: "
+
+        if "winner" in game_state:
+            winner = game_state.split(":")[2].strip()
+            if winner == self.client_name:
+                game_result += "You win!"
+            else:
+                game_result += "You lose!"
+
+        elif "draw" in game_state:
+            game_result += "It's a draw!"
+
+        print(game_result)
+
+        self.game_over = True
+
+        # Update the labels
+        self.root.after(0, lambda: self.update_labels(info_message=game_result))
+
+        # Ask player to play again or quit
+        self.root.after(REQUEST_INTERVAL, lambda: self.ask_play_again(game_result))
 
 
     def ask_play_again(self, result_message):
@@ -518,10 +435,6 @@ class GameWindow:
         print("*** Cancelling callbacks ***")
 
         try:
-            self.root.after_cancel(self.get_player_state)
-            self.root.after_cancel(self.get_opponent_state)
-            self.root.after_cancel(self.check_game_result)
-            self.root.after_cancel(self.check_round_state)
             self.root.after_cancel(self.check_inactivity)
             self.root.after_cancel(self.check_game_state)
         except Exception as e:

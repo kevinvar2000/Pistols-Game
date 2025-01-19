@@ -86,6 +86,7 @@ class Client:
                     raise ValueError("Received empty response from the server.")
 
                 response = self.parse_response(response_data)
+                print(f"Parsed response: {response}")
 
                 if response.get("response_type") == request_type:
                     return response
@@ -118,6 +119,9 @@ class Client:
                 print(f"Malformed pair ignored: {pair}")
                 continue
             key, value = pair.split("=", 1)
+
+            # remove \n from the value
+            value = value.replace("\n", "")
             response[key] = value
         return response
 
