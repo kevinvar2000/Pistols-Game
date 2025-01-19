@@ -1,0 +1,46 @@
+sequenceDiagram
+    autonumber
+Note left of Client: First message
+    Client->>Server: request_type=hello
+    Server-->>Client: response_type=hello&status_code=200&message=Hello
+    
+    loop Background Ping
+        Client->>Server: request_type=ping
+        Server-->>Client: response_type=ping&status_code=200&message=Pong
+    end
+
+Note left of Client: Log in
+    Client->>Server: request_type=name&name=idk
+    alt registration
+    Server-->>Client: response_type=name&status_code=200&message=Player registered
+    else reconenct
+    Server-->>Client: response_type=name&status_code=200&message=Player reconnected
+    end
+
+Note left of Client: Start the game
+    Client->>Server: request_type=start_game
+    alt start game
+    Server-->>Client: response_type=start_game&status_code=200&player_state=health=3,ammo=1&opponent_state=health=3&game_state=running&message=Send action
+    else restarting game without sending reset
+    Server-->>Client: response_type=start_game&status_code=403&message=Player is dead, send reset_game
+    end
+
+Note left of Client: request_type=action_type=shoot
+Note left of Client: request_type=action_type=reload
+Note left of Client: request_type=action_type=cover
+    Client->>Server: request_type=action&action_type=shoot
+    Server-->>Client: response_type=action&status_code=200&player_state=health=3,ammo=0&opponent_state=health=2&game_state=running&message=Send action
+             
+Note left of Client: Informational
+    Client->>Server: request_type=game_state
+    Server-->>Client: response_type=game_state&status_code=200&message=Game running
+
+Note left of Client: Reset game after game is over
+    Client->>Server: request_type=reset_game
+    Server-->>Client: response_type=reset_game&status_code=200&message=Game reset
+
+Note left of Client: Close game
+    Client->>Server: request_type=close_game
+    Server-->>Client: response_type=close_game&status_code=200&message=Goodbye
+
+

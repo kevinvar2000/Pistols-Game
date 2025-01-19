@@ -1,0 +1,14 @@
+request_type=ping
+
+request_type=hello
+
+request_type=name&name=idk
+
+request_type=start_game
+
+request_type=action&action_type=shoot
+
+request_type=reset_game
+
+request_type=close_game
+
