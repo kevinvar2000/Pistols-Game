@@ -10,7 +10,7 @@ Note left of Client: First message
     end
 
 Note left of Client: Log in
-    Client->>Server: request_type=name&name=idk
+    Client->>Server: request_type=name&name=Pepa
     alt registration
     Server-->>Client: response_type=name&status_code=200&message=Player registered
     else reconenct
@@ -29,8 +29,16 @@ Note left of Client: request_type=action_type=shoot
 Note left of Client: request_type=action_type=reload
 Note left of Client: request_type=action_type=cover
     Client->>Server: request_type=action&action_type=shoot
+    alt action sent
     Server-->>Client: response_type=action&status_code=200&player_state=health=3,ammo=0&opponent_state=health=2&game_state=running&message=Send action
-             
+    else player won
+    Server-->>Client: response_type=action&status_code=200&player_state=health=3,ammo=0&opponent_state=dead&game_state=over:winner:Pepa&message=Game over
+    else opponent won
+    Server-->>Client: response_type=action&status_code=200&player_state=dead&opponent_state=health=2&game_state=over:winner:Franta&message=Game over
+    else draw
+    Server-->>Client: response_type=action&status_code=200&player_state=dead&opponent_state=dead&game_state=over:draw&message=Game over
+    end
+
 Note left of Client: Informational
     Client->>Server: request_type=game_state
     Server-->>Client: response_type=game_state&status_code=200&message=Game running
