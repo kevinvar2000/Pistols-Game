@@ -59,7 +59,7 @@ func register_player(conn net.Conn, request string) *Player {
 		delete(disconnected_players, player_name)
 
 		// Send a response to the player
-		conn.Write([]byte("response_type=name&status_code=200&message=Player reconnected\n"))
+		conn.Write([]byte("response_type=name&status_code=200&message=Player reconnection, start the game\n"))
 
 	} else {
 		fmt.Println("New player registered:", player_name)

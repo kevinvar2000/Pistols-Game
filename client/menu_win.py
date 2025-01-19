@@ -46,7 +46,7 @@ class MenuWindow:
         if response.get("response_type") == "name":
             if response.get("status_code") == "200":
 
-                if response.get("message") == "Player reconnected":
+                if "Player reconnection" in response.get("message"):
                     print("Player reconnected")
                 elif response.get("message") == "Player registered":
                     print("Player registered")
